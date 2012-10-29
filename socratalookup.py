@@ -4,6 +4,10 @@ class SocrataLookup:
 
 	@classmethod
 	def get_signs(cls, lat, lon, meters):
+		lat = float(lat)
+		lon = float(lon)
+		meters = float(meters)
+	
 		cl = SoClient("data.seattle.gov", "it8u-sznv")
 		
 		meters_per_degree = 111185.10693302986
