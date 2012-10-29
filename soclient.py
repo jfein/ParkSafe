@@ -21,7 +21,7 @@ class SoClient:
             method,
             uri,
             data={},
-            headers={}):      
+            headers={}):     
         jsonData = json.dumps(data)
         self.conn.request(method, uri, jsonData, headers)
         
@@ -30,6 +30,7 @@ class SoClient:
             print "There was an error detected."
             print "Response status = %s.\n" % response.status
             print "Response reason = %s.\n" % response.reason
+            print "Response = %s.\n" % response.read()
             raise SystemExit(1)
             
         rawResponse = response.read()
@@ -38,7 +39,7 @@ class SoClient:
     def _get_columns(self):
         return self._call_api(
             method="GET",
-            uri="/api/views/7ais-f98f/columns.json"
+            uri="/api/views/" + self.view_id + "/columns.json"
         ) 
         
     def _get_col_id(self, name):
@@ -108,7 +109,14 @@ class SoClient:
             "value" : "GREATER_THAN",
             "children" : args
         }    
-    
+        
+    def LESS_THAN(self, *args):
+        return {
+            "type" : "operator",
+            "value" : "LESS_THAN",
+            "children" : args
+        }     
+        
     def VAL(self, val):
         return {
             "type" : "literal",
