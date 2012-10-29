@@ -100,7 +100,14 @@ class SoClient:
             "type" : "operator",
             "value" : "EQUALS",
             "children" : args
-        }       
+        }
+
+    def GREATER_THAN(self, *args):
+        return {
+            "type" : "operator",
+            "value" : "GREATER_THAN",
+            "children" : args
+        }    
     
     def VAL(self, val):
         return {
