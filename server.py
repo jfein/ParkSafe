@@ -19,6 +19,7 @@ class WebService(tornado.web.Application):
     def __init__(self):
         h = [
 			(r"/", handlers.HomeHandler),
+            (r"/query.json", handlers.QueryHandler),
             (r"/crimes.json", handlers.CrimesHandler),
             (r"/signs.json", handlers.SignsHandler),
         ]
