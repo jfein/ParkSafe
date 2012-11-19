@@ -16,11 +16,6 @@ class BaseHandler(tornado.web.RequestHandler):
         self.finish("Error {status_code} - {message}".format(**locals()))
 		
 		
-class HomeHandler(BaseHandler):
-	def get(self):
-		self.render("index.html")
-		
-		
 class CrimesHandler(BaseHandler):
     def get(self):
 		lat = self.get_argument("lat", 0)
@@ -47,14 +42,9 @@ class SignsHandler(BaseHandler):
 
 class QueryHandler(BaseHandler):
     def get(self):
-        lat = self.get_argument("lat", 0)
-        lon = self.get_argument("lon", 0)
-        meters = self.get_argument("meters", 10)
-
-        res1 = SocrataLookup.get_signs(lat, lon, meters)
-        res2 = SocrataLookup.get_crimes(lat, lon, meters)
-
-        res = {'signs':res1 , 'crimes':res2}
-
-        self.set_header("Content-Type", "application/json")
-        self.write(json.dumps(res))
+        self.render("query.html")
+        
+        
+class IndexHandler(BaseHandler):
+    def get(self):
+        self.render("index.html")

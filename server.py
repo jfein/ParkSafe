@@ -18,13 +18,14 @@ class WebService(tornado.web.Application):
     """The Movie Service Web Application"""
     def __init__(self):
         h = [
-			(r"/", handlers.HomeHandler),
-            (r"/query.json", handlers.QueryHandler),
+			(r"/", handlers.IndexHandler),
+            (r"/query.html", handlers.QueryHandler),
             (r"/crimes.json", handlers.CrimesHandler),
             (r"/signs.json", handlers.SignsHandler),
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
+            static_path=os.path.join(os.path.dirname(__file__), "static"),
             debug=True,
             autoescape=None,
         )

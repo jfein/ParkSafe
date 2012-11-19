@@ -1,31 +1,23 @@
+<!DOCTYPE html>
 <html>
+
+<head>
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="/static/style.css">
+<script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWEtfm6B9jVhnR3wOefB80ODwxPOGQUTQ&sensor=true"></script>
+<script src="http://code.jquery.com/jquery-latest.js"></script>
+<script type="text/javascript" src="/static/parksafe.js"></script>
+</head>
+
 <body>
-
-<h3>Crimes</h3>
-<form method="GET" action="/crimes.json">
-	Lat: <input type='text' name='lat'><br>
-	Lon: <input type='text' name='lon'><br>
-	Dist: <input type='text' name='meters'><br>
-	<input type='submit'>
-</form>
-
-<br><br>
-
-<h3>Signs</h3>
-<form method="GET" action="/signs.json">
-	Lat: <input type='text' name='lat'><br>
-	Lon: <input type='text' name='lon'><br>
-	Dist: <input type='text' name='meters'><br>
-	<input type='submit'>
-</form>
-
-<h3>Crimes + Signs</h3>
-<form method="GET" action="/query.json">
-	Lat: <input type='text' name='lat'><br>
-	Lon: <input type='text' name='lon'><br>
-	Dist: <input type='text' name='meters'><br>
-	<input type='submit'>
-</form>
-
+	<div id="map_canvas"></div>
+	
+	<div id="button_canvas">
+		<button id="center">Center</button>
+		<button id="close">Close</button>
+	</div>
+	
+	<div id="sign_canvas"></div>
 </body>
+
 </html>
