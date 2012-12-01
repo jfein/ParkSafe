@@ -102,6 +102,13 @@ class SoClient:
             "value" : "EQUALS",
             "children" : args
         }
+        
+    def NOT_EQUALS(self, *args):
+        return {
+            "type" : "operator",
+            "value" : "NOT_EQUALS",
+            "children" : args
+        }
 
     def GREATER_THAN(self, *args):
         return {
