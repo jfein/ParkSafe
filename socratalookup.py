@@ -24,7 +24,10 @@ class SocrataLookup:
 				cl.GREATER_THAN(cl.COL("latitude"), cl.VAL(lat_min)),
 				cl.LESS_THAN(cl.COL("latitude"), cl.VAL(lat_max)),
 				cl.GREATER_THAN(cl.COL("longitude"), cl.VAL(lon_min)),
-				cl.LESS_THAN(cl.COL("longitude"), cl.VAL(lon_max))
+				cl.LESS_THAN(cl.COL("longitude"), cl.VAL(lon_max)),
+                cl.NOT_EQUALS(cl.COL("customtext"), cl.VAL("[METRO LOGO] BUS (ROUTES)")),
+                cl.NOT_EQUALS(cl.COL("customtext"), cl.VAL("[45L - 45R DOWNWARD ARROWS]")),
+                cl.NOT_EQUALS(cl.COL("customtext"), cl.VAL("DGST: R432 (4028) - TXT: *AFT LN 10: EVERYDAY"))
 			)
 		)
 
