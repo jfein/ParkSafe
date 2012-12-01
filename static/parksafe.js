@@ -94,13 +94,15 @@ function addSigns(signs) {
 			zIndex: 10,
 		});
 		sign_markers.push(marker);
-		
+
 		// Add click event to marker
 		google.maps.event.addListener(
 			marker, 
 			"click", 
 			function() {
-				activateSignMarker(i);				
+				activateSignMarker(i);
+				infowindow.setContent(sign.customtext);
+				infowindow.open(map, marker);				
 			}
 		);
 
@@ -134,13 +136,14 @@ function addCrimes(crimes) {
 			zIndex: 20,
 		});
 		crime_markers.push(marker);
-		
+
 		// Add click event to marker
 		google.maps.event.addListener(
 			marker, 
 			"click", 
 			function() {
-				alert(crime.offense_type);			
+				infowindow.setContent(crime.offense_type);
+				infowindow.open(map, marker);	
 			}
 		);	
 	});
@@ -241,6 +244,11 @@ var map;
 var sign_markers = [];
 var crime_markers = [];
 
+var infoOptions = {
+	pixelOffset: new google.maps.Size(-100,10),
+};
+var infowindow = new google.maps.InfoWindow(infoOptions);
+
 var active_sign = -1;
 
 	
@@ -260,6 +268,7 @@ $(document).ready(function() {
 	// Add close button
 	$("#close").click(function() {
 		deactivateMarkers();
+		infowindow.close();
 	});
 	
 	// Add search here button
