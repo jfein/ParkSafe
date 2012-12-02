@@ -16,30 +16,6 @@ function loadMap(lat, lon) {
 	};
 	map = new google.maps.Map($("#map_canvas")[0], mapOptions);
 	geocoder = new google.maps.Geocoder();
-    
-	/*
-	// Make green marker for our position
-	var pinColor = "C6EF8C";
-	var pinImage = new google.maps.MarkerImage(
-		"http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|" + pinColor,
-		new google.maps.Size(20, 34),
-		new google.maps.Point(0,0),
-		new google.maps.Point(10, 34)
-	);
-	var pinShadow = new google.maps.MarkerImage(
-		"http://chart.apis.google.com/chart?chst=d_map_pin_shadow",
-		new google.maps.Size(40, 37),
-		new google.maps.Point(0, 0),
-		new google.maps.Point(12, 35)
-	);
-	var marker = new google.maps.Marker({
-		position: new google.maps.LatLng(lat , lon),
-		map: map,
-		icon: pinImage,
-		shadow: pinShadow,
-		zIndex: 0,
-	});
-	*/
 	
 	// Query page on first map load
 	google.maps.event.addListenerOnce(map, 'idle', function(){
@@ -130,6 +106,7 @@ function addSigns(signs) {
 			"click", 
 			function() {
 				activateSignMarker(id);
+				querySign(sign.objectid);
 				infowindow.setContent(sign.categoryde + "<br>" + sign.latitude + " " + sign.longitude);
 				infowindow.open(map, marker);				
 			}
@@ -181,13 +158,31 @@ function codeAddress() {
 }
 
 
+function querySign(id) {
+	$.ajax({
+		url: 'signs/' + id + '.json',
+		type: "GET",
+		contentType: "application/json; charset=utf-8",
+		dataType: "json",
+		success: function(sign) {
+			addCrimes(sign.crimes)
+		}
+	});
+}
+
+
 function querySigns(lat, lon, meters) {
+	var data = { "lat" : lat , "lon" : lon , "meters" : meters };
+	if ($("#filter_time").is(":checked")) {
+		data['filter_time'] = "True";
+	}
+
 	$.ajax({
 		url: 'signs.json',
 		type: "GET",
 		contentType: "application/json; charset=utf-8",
 		dataType: "json",
-		data: { "lat" : lat , "lon" : lon , "meters" : meters },
+		data: data,
 		success: function(signs) {
 			addSigns(signs);
 		}
@@ -202,8 +197,8 @@ function queryCrimes(lat, lon, meters) {
 		contentType: "application/json; charset=utf-8",
 		dataType: "json",
 		data: { "lat" : lat , "lon" : lon , "meters" : meters },
-		success: function(signs) {
-			addCrimes(signs);
+		success: function(crimes) {
+			addCrimes(crimes);
 		}
 	});
 }

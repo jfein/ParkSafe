@@ -8,7 +8,7 @@ class SocrataLookup:
     signs = {}
 
     @classmethod
-    def get_signs(cls, base_uri, lat, lon, meters, filter_time=None):
+    def get_signs(cls, lat, lon, meters, filter_time=None):
         lat = float(lat)
         lon = float(lon)
         meters = float(meters)
@@ -26,8 +26,8 @@ class SocrataLookup:
         
         if filter_time:
             term = cl.AND(
-                cl.GREATER_THAN(cl.COL("starttime"), cl.VAL(filter_time)),
-                cl.LESS_THAN(cl.COL("endtime"), cl.VAL(filter_time)), 
+                cl.GREATER_THAN_OR_EQUALS(cl.COL("starttime"), cl.VAL(filter_time)),
+                cl.LESS_THAN_OR_EQUALS(cl.COL("endtime"), cl.VAL(filter_time)), 
             )
         else:
             term = cl.AND()
@@ -50,13 +50,7 @@ class SocrataLookup:
         for d in data:
             cls.signs[d['objectid']] = d
         
-        return [ dict(
-                    objectid=d['objectid'], 
-                    latitude=d['latitude'], 
-                    longitude=d['longitude'], 
-                    categoryde=d['categoryde'],  
-                    uri=base_uri+"/signs/"+d['objectid']+".json"
-                ) for d in data ]
+        return data
         
     @classmethod
     def get_sign(cls, id):
@@ -66,12 +60,17 @@ class SocrataLookup:
             
         # query and save to cache
         cl = SoClient("data.seattle.gov", "it8u-sznv")
-        data = cl.query(cl.EQUALS(cl.COL("objectid"), cl.VAL(id)))[0]
-        cls.signs[data['objectid']] = data
-        return data
+        data = cl.query(cl.EQUALS(cl.COL("objectid"), cl.VAL(id)))
+        if not data:
+            return None
+            
+        # save to cache
+        cls.signs[data[0]['objectid']] = data[0]
+        
+        return data[0]
 
     @classmethod
-    def get_crimes(cls, base_uri, lat, lon, meters):
+    def get_crimes(cls, lat, lon, meters):
         cl = SoClient("data.seattle.gov", "7ais-f98f")
 
         data = cl.query(
@@ -132,13 +131,7 @@ class SocrataLookup:
         for d in data:
             cls.crimes[d['rms_cdw_id']] = d
         
-        return [ dict(
-                    rms_cdw_id=d['rms_cdw_id'], 
-                    latitude=d['latitude'], 
-                    longitude=d['longitude'], 
-                    summarized_offense_description=d['summarized_offense_description'],  
-                    uri=base_uri+"/crimes/"+d['rms_cdw_id']+".json"
-                ) for d in data ]
+        return data
                 
     @classmethod
     def get_crime(cls, id):
@@ -148,6 +141,11 @@ class SocrataLookup:
             
         # query and save to cache
         cl = SoClient("data.seattle.gov", "7ais-f98f")
-        data = cl.query(cl.EQUALS(cl.COL("rms_cdw_id"), cl.VAL(id)))[0]
-        cls.crimes[data['rms_cdw_id']] = data
-        return data
+        data = cl.query(cl.EQUALS(cl.COL("rms_cdw_id"), cl.VAL(id)))
+        if not data:
+            return None    
+
+        # save to cache
+        cls.crimes[data[0]['rms_cdw_id']] = data[0]
+        
+        return data[0]

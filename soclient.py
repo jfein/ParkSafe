@@ -1,5 +1,6 @@
 import httplib
 import json
+import time
 
 conns = {}
 
@@ -51,6 +52,7 @@ class SoClient:
         except:
             print "FUCKED UP"
             self.remove_conn()
+            time.sleep(50)
             self._call_api(method, uri, data, headers)
             
 
@@ -138,11 +140,25 @@ class SoClient:
     def GREATER_THAN(self, *args):
         return {
             "type" : "operator",
+            "value" : "GREATER_THAN",
+            "children" : args
+        }    
+        
+    def GREATER_THAN_OR_EQUALS(self, *args):
+        return {
+            "type" : "operator",
             "value" : "GREATER_THAN_OR_EQUALS",
             "children" : args
         }    
         
     def LESS_THAN(self, *args):
+        return {
+            "type" : "operator",
+            "value" : "LESS_THAN",
+            "children" : args
+        }     
+        
+    def LESS_THAN_OR_EQUALS(self, *args):
         return {
             "type" : "operator",
             "value" : "LESS_THAN_OR_EQUALS",
