@@ -1,6 +1,7 @@
 import httplib
 import json
 
+conns = {}
 
 class SoClient:
     '''
@@ -11,8 +12,17 @@ class SoClient:
     def __init__(self, host, view_id):
         self.host = host
         self.view_id = view_id
-        self.conn = httplib.HTTPConnection(self.host)
         self.cols = self._get_columns()
+        
+    def get_conn(self):
+        global conns
+        if self.host not in conns:
+            conns[self.host] = httplib.HTTPConnection(self.host)
+        return conns[self.host]
+        
+    def remove_conn(self):
+        global conns
+        del(conns[self.host])
         
     # Calls socrata API
     # Will crash if error
@@ -21,20 +31,28 @@ class SoClient:
             method,
             uri,
             data={},
-            headers={}):     
-        jsonData = json.dumps(data)
-        self.conn.request(method, uri, jsonData, headers)
-        
-        response = self.conn.getresponse()
-        if response.reason != 'OK':
-            print "There was an error detected."
-            print "Response status = %s.\n" % response.status
-            print "Response reason = %s.\n" % response.reason
-            print "Response = %s.\n" % response.read()
-            raise SystemExit(1)
+            headers={}):
+        try:
+            conn = self.get_conn()
             
-        rawResponse = response.read()
-        return json.loads(rawResponse)
+            jsonData = json.dumps(data)
+            conn.request(method, uri, jsonData, headers)
+            
+            response = conn.getresponse()
+            if response.reason != 'OK':
+                print "There was an error detected."
+                print "Response status = %s.\n" % response.status
+                print "Response reason = %s.\n" % response.reason
+                print "Response = %s.\n" % response.read()
+                raise SystemExit(1)
+                
+            rawResponse = response.read()
+            return json.loads(rawResponse)
+        except:
+            print "FUCKED UP"
+            self.remove_conn()
+            self._call_api(method, uri, data, headers)
+            
 
     def _get_columns(self):
         return self._call_api(
@@ -109,18 +127,25 @@ class SoClient:
             "value" : "NOT_EQUALS",
             "children" : args
         }
+        
+    def CONTAINS(self, *args):
+        return {
+            "type" : "operator",
+            "value" : "CONTAINS",
+            "children" : args
+        }
 
     def GREATER_THAN(self, *args):
         return {
             "type" : "operator",
-            "value" : "GREATER_THAN",
+            "value" : "GREATER_THAN_OR_EQUALS",
             "children" : args
         }    
         
     def LESS_THAN(self, *args):
         return {
             "type" : "operator",
-            "value" : "LESS_THAN",
+            "value" : "LESS_THAN_OR_EQUALS",
             "children" : args
         }     
         

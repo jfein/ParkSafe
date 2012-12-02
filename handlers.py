@@ -14,30 +14,51 @@ class BaseHandler(tornado.web.RequestHandler):
     def write_error(self, status_code, message):
         self.set_status(status_code)
         self.finish("Error {status_code} - {message}".format(**locals()))
-		
-		
+        
+        
 class CrimesHandler(BaseHandler):
     def get(self):
-		lat = self.get_argument("lat", 0)
-		lon = self.get_argument("lon", 0)
-		meters = self.get_argument("meters", 10)
-		
-		res = SocrataLookup.get_crimes(lat, lon, meters)
-		
-		self.set_header("Content-Type", "application/json")
-		self.write(json.dumps(res))
-		
-		
+        lat = self.get_argument("lat", 0)
+        lon = self.get_argument("lon", 0)
+        meters = self.get_argument("meters", 10)
+        
+        res = SocrataLookup.get_crimes(self.base_uri, lat, lon, meters)
+        
+        self.set_header("Content-Type", "application/json")
+        self.write(json.dumps(res))
+        
+        
+class CrimeHandler(BaseHandler):
+    def get(self, id):        
+        res = SocrataLookup.get_crime(id)
+    
+        self.set_header("Content-Type", "application/json")
+        self.write(json.dumps(res))
+        
+        
 class SignsHandler(BaseHandler):
     def get(self):
-		lat = self.get_argument("lat", 0)
-		lon = self.get_argument("lon", 0)
-		meters = self.get_argument("meters", 10)
-		
-		res = SocrataLookup.get_signs(lat, lon, meters)
-	
-		self.set_header("Content-Type", "application/json")
-		self.write(json.dumps(res))
+        lat = self.get_argument("lat", 0)
+        lon = self.get_argument("lon", 0)
+        meters = self.get_argument("meters", 10)
+        
+        res = SocrataLookup.get_signs(self.base_uri, lat, lon, meters)
+    
+        self.set_header("Content-Type", "application/json")
+        self.write(json.dumps(res))
+
+        
+class SignHandler(BaseHandler):
+    def get(self, id):        
+        distance = self.get_argument("distance", 20)
+    
+        sign = SocrataLookup.get_sign(id)
+        crimes = SocrataLookup.get_crimes(self.base_uri, sign['latitude'], sign['longitude'], distance)
+        sign['crimes'] = crimes
+
+    
+        self.set_header("Content-Type", "application/json")
+        self.write(json.dumps(sign))
         
 
 class QueryHandler(BaseHandler):

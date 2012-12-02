@@ -9,14 +9,15 @@ function loadMap(lat, lon) {
 	// Create map
 	var mapOptions = {
 		center: new google.maps.LatLng(lat , lon),
-		minZoom: 17,
-		zoom: 19,
+		minZoom: 15,
+		zoom: 18,
 		maxZoom: 25,
 		mapTypeId: google.maps.MapTypeId.ROADMAP,
 	};
 	map = new google.maps.Map($("#map_canvas")[0], mapOptions);
 	geocoder = new google.maps.Geocoder();
     
+	/*
 	// Make green marker for our position
 	var pinColor = "C6EF8C";
 	var pinImage = new google.maps.MarkerImage(
@@ -38,6 +39,7 @@ function loadMap(lat, lon) {
 		shadow: pinShadow,
 		zIndex: 0,
 	});
+	*/
 	
 	// Query page on first map load
 	google.maps.event.addListenerOnce(map, 'idle', function(){
@@ -50,16 +52,15 @@ function deactivateMarkers() {
 	$(sign_markers).each(function(i, marker) {
 		marker.setIcon(img_sign);
 		marker.setZIndex(10);
-		$('#'+i).removeClass('sign_active');
 	});
-	active_sign = -1;
-	
+
 	// Deactivate crimes
 	$(crime_markers).each(function(i, marker) {
 		marker.setIcon(img_crime);
 		marker.setZIndex(10);
-		$('#'+i).removeClass('crime_active');
 	});
+	
+	active_sign = -1;
 }
 
 
@@ -77,6 +78,19 @@ function activateSignMarker(id) {
 	}
 }
 
+function activateCrimeMarker(id) {
+	if (active_sign != id) {
+		// Deactivate old sign markers
+		deactivateMarkers();
+		
+		// Activate this sign marker
+		crime_markers[id].setIcon(img_crime_active);
+		crime_markers[id].setZIndex(11);
+		
+		active_sign = id;
+	}
+}
+
 
 function addSigns(signs) {
 	// Remove old signs
@@ -84,25 +98,21 @@ function addSigns(signs) {
 		sign_marker.setMap(null);
 	});
 	sign_markers = [];
-	$('#sign_canvas').html("");
 
+	// Aggregate signs at same location
     var compiledSigns = {};
     $(signs).each(function(i, sign) {
         var key = sign.latitude + "," + sign.longitude;
         if (key in compiledSigns) {
-            compiledSigns[key].customtext += ("<BR>" + sign.customtext);
+			if (compiledSigns[key].categoryde.indexOf(sign.categoryde) == -1)
+				compiledSigns[key].categoryde += ("<BR>" + sign.categoryde);
         }
         else {
             compiledSigns[key] = sign;
         }
     });
-    
-    var signArray = new Array();
-    for (var key in compiledSigns) {
-        signArray.push(compiledSigns[key])
-    }
-    
-    $(signArray).each(function(i,sign) {
+
+    $.each(compiledSigns, function(key,sign) {
 		// Create a marker for the sign	
 		var marker = new google.maps.Marker({
 			position: new google.maps.LatLng(sign.latitude , sign.longitude),
@@ -111,28 +121,19 @@ function addSigns(signs) {
 			zIndex: 10,
 		});
 		sign_markers.push(marker);
+		
+		var id = sign_markers.length - 1;
 
 		// Add click event to marker
 		google.maps.event.addListener(
 			marker, 
 			"click", 
 			function() {
-				activateSignMarker(i);
-				infowindow.setContent(sign.customtext);
+				activateSignMarker(id);
+				infowindow.setContent(sign.categoryde + "<br>" + sign.latitude + " " + sign.longitude);
 				infowindow.open(map, marker);				
 			}
 		);
-
-		// Create a DIV for the sign
-		var div = "<div class='sign' id='" + i + "'>" 
-			+ sign.customtext + "</div>";
-		$('#sign_canvas').append(div);
-	});
-
-	// Add click event to each sign divs
-	$('.sign').click(function() {
-		activateSignMarker(this.id);
-		map.setCenter(sign_markers[this.id].getPosition());
 	});
 }
 
@@ -150,7 +151,7 @@ function addCrimes(crimes) {
 			position: new google.maps.LatLng(crime.latitude , crime.longitude),
 			map: map,
 			icon: img_crime,
-			zIndex: 20,
+			zIndex: 10,
 		});
 		crime_markers.push(marker);
 
@@ -159,7 +160,8 @@ function addCrimes(crimes) {
 			marker, 
 			"click", 
 			function() {
-				infowindow.setContent(crime.offense_type);
+				activateCrimeMarker(i);
+				infowindow.setContent(crime.summarized_offense_description);
 				infowindow.open(map, marker);	
 			}
 		);	
@@ -221,7 +223,7 @@ function queryMap() {
 	x = (ne_lat - lat) * meters_per_degree;
 	y = (ne_lon - lon) * meters_per_degree;
 	
-	meters = Math.sqrt(x*x + y*y);
+	meters = Math.min(300, Math.sqrt(x*x + y*y));
 	
 	querySigns(lat, lon, meters)
 	queryCrimes(lat, lon, meters)	
@@ -276,7 +278,9 @@ var infoOptions = {
 	pixelOffset: new google.maps.Size(-100,10),
 };
 var infowindow = new google.maps.InfoWindow(infoOptions);
-
+google.maps.event.addListener(infowindow,'closeclick', function(){
+   deactivateMarkers();
+});
 var active_sign = -1;
 
 	

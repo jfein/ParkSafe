@@ -19,9 +19,11 @@ class WebService(tornado.web.Application):
     def __init__(self):
         h = [
 			(r"/", handlers.IndexHandler),
-            (r"/query.html", handlers.QueryHandler),
-            (r"/crimes.json", handlers.CrimesHandler),
-            (r"/signs.json", handlers.SignsHandler),
+            (r"/query\.html", handlers.QueryHandler),
+            (r"/crimes\.json", handlers.CrimesHandler),
+            (r"/signs\.json", handlers.SignsHandler),
+            (r"/signs/(\d+)\.json", handlers.SignHandler),
+            (r"/crimes/(\d+)\.json", handlers.CrimeHandler)
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
