@@ -15,7 +15,8 @@ function loadMap(lat, lon) {
 		mapTypeId: google.maps.MapTypeId.ROADMAP,
 	};
 	map = new google.maps.Map($("#map_canvas")[0], mapOptions);
-	
+	geocoder = new google.maps.Geocoder();
+    
 	// Make green marker for our position
 	var pinColor = "C6EF8C";
 	var pinImage = new google.maps.MarkerImage(
@@ -166,6 +167,16 @@ function addCrimes(crimes) {
 }
 
 
+function codeAddress() {
+    var address = document.getElementById("address").value + " AND Seattle, Washington";
+    geocoder.geocode( { 'address': address}, function(results, status) {
+        if (status == google.maps.GeocoderStatus.OK) {
+            map.setCenter(results[0].geometry.location);
+        } else {
+            alert("Geocode was not successful for the following reason: " + status);
+        }
+    });
+}
 
 
 function querySigns(lat, lon, meters) {
@@ -257,6 +268,7 @@ var img_crime_active = new google.maps.MarkerImage(
  
 
 var map;
+var geocoder;
 var sign_markers = [];
 var crime_markers = [];
 
