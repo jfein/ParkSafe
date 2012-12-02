@@ -85,7 +85,23 @@ function addSigns(signs) {
 	sign_markers = [];
 	$('#sign_canvas').html("");
 
-	$(signs).each(function(i, sign) {
+    var compiledSigns = {};
+    $(signs).each(function(i, sign) {
+        var key = sign.latitude + "," + sign.longitude;
+        if (key in compiledSigns) {
+            compiledSigns[key].customtext += ("<BR>" + sign.customtext);
+        }
+        else {
+            compiledSigns[key] = sign;
+        }
+    });
+    
+    var signArray = new Array();
+    for (var key in compiledSigns) {
+        signArray.push(compiledSigns[key])
+    }
+    
+    $(signArray).each(function(i,sign) {
 		// Create a marker for the sign	
 		var marker = new google.maps.Marker({
 			position: new google.maps.LatLng(sign.latitude , sign.longitude),
