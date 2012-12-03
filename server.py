@@ -7,7 +7,7 @@ import tornado.options
 import tornado.web
 
 from tornado.options import define, options
-
+from rdflib import ConjunctiveGraph, URIRef, Literal, Namespace, RDF
 import handlers
 
 
@@ -20,10 +20,10 @@ class WebService(tornado.web.Application):
         h = [
 			(r"/", handlers.IndexHandler),
             (r"/query\.html", handlers.QueryHandler),
-            (r"/crimes\.json", handlers.CrimesHandler),
-            (r"/signs\.json", handlers.SignsHandler),
-            (r"/signs/(\d+)\.json", handlers.SignHandler),
-            (r"/crimes/(\d+)\.json", handlers.CrimeHandler)
+            (r"/crimes(\..+)?", handlers.CrimesHandler),
+            (r"/signs(\..+)?", handlers.SignsHandler),
+            (r"/signs/([0-9]+)(\..+)?", handlers.SignHandler),
+            (r"/crimes/([0-9]+)(\..+)?", handlers.CrimeHandler)
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
