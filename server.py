@@ -7,7 +7,6 @@ import tornado.options
 import tornado.web
 
 from tornado.options import define, options
-from rdflib import ConjunctiveGraph, URIRef, Literal, Namespace, RDF
 import handlers
 
 

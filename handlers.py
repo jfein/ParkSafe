@@ -2,6 +2,16 @@ from socratalookup import SocrataLookup
 import tornado.web
 import json, datetime
 
+from rdflib import ConjunctiveGraph, URIRef, Literal, Namespace, RDF
+
+GEO = Namespace('http://www.w3.org/2003/01/geo/wgs84_pos#')
+DCTERMS = Namespace('http://purl.org/dc/terms/')
+DBPEDIAOWL = Namespace('http://dbpedia.org/ontology/')
+DBPEDIAPROP = Namespace('http://dbpedia.org/property/')
+YAGO = Namespace('http://dbpedia.org/class/yago/')
+PARKSAFESIGN = Namespace('http://parksafe.com/terms/signs/')
+PARKSAFECRIME = Namespace('http://parksafe.com/terms/crimes/')
+
 
 class BaseHandler(tornado.web.RequestHandler):       
     @property
@@ -72,6 +82,32 @@ class CrimeHandler(BaseHandler):
         elif format == ".json":
             self.set_header("Content-Type", "application/json")
             self.write(json.dumps(filteredCrime))
+        elif format == ".rdf" or format == ".nt" or format == ".ttl":
+            graph = ConjunctiveGraph()
+            graph.bind('geo', GEO)
+            graph.bind('dcterms', DCTERMS)
+            graph.bind('dbpediaowl', DBPEDIAOWL)
+            graph.bind('parksafecrime', PARKSAFECRIME)
+            
+            crimeURI = self.base_uri + "/crimes/" + id
+            
+            graph.add((URIRef(crimeURI), RDF.type, DBPEDIAOWL['event']))
+            graph.add((URIRef(crimeURI), GEO['lat'], Literal(filteredCrime['latitude'])))
+            graph.add((URIRef(crimeURI), GEO['lon'], Literal(filteredCrime['longitude'])))
+            graph.add((URIRef(crimeURI), PARKSAFECRIME['offenseDescription'], Literal(filteredCrime['summarized_offense_description'])))
+            graph.add((URIRef(crimeURI), PARKSAFECRIME['occuredDate'], Literal(filteredCrime['occurred_date_or_date_range_start'])))
+            graph.add((URIRef(crimeURI), PARKSAFECRIME['blockInformation'], Literal(filteredCrime['hundred_block_location'])))
+            graph.add((URIRef(crimeURI), PARKSAFECRIME['offenseType'], Literal(filteredCrime['offense_type'])))
+            
+            if format == ".rdf":
+                self.set_header("Content-Type", "application/rdf+xml")
+                self.write(graph.serialize())
+            elif format == ".nt":
+                self.set_header("Content-Type", "text/plain")
+                self.write(graph.serialize(format='nt'))
+            else:
+                self.set_header("Content-Type", "text/turtle")
+                self.write(graph.serialize(format='turtle')) 
         else:
             self.write_error(401, message="Format %s not supported" % format)
         
@@ -152,6 +188,35 @@ class SignHandler(BaseHandler):
         elif format == ".json":
             self.set_header("Content-Type", "application/json")
             self.write(json.dumps(filteredSign))
+        elif format == ".rdf" or format == ".nt" or format == ".ttl":
+            graph = ConjunctiveGraph()
+            graph.bind('geo', GEO)
+            graph.bind('dcterms', DCTERMS)
+            graph.bind('yago', YAGO)
+            graph.bind('parksafesign', PARKSAFESIGN)
+            
+            signURI = self.base_uri + "/signs/" + id
+            
+            graph.add((URIRef(signURI), RDF.type, YAGO['TrafficSigns']))
+            graph.add((URIRef(signURI), GEO['lat'], Literal(filteredSign['latitude'])))
+            graph.add((URIRef(signURI), GEO['lon'], Literal(filteredSign['longitude'])))
+            graph.add((URIRef(signURI), PARKSAFESIGN['categoryDescription'], Literal(filteredSign['categoryde'])))
+            graph.add((URIRef(signURI), PARKSAFESIGN['signText'], Literal(filteredSign['customtext'])))
+            graph.add((URIRef(signURI), PARKSAFESIGN['blockInformation'], Literal(filteredSign['unitdesc'])))
+            graph.add((URIRef(signURI), PARKSAFESIGN['starttime'], Literal(filteredSign['starttime'])))
+            graph.add((URIRef(signURI), PARKSAFESIGN['endtime'], Literal(filteredSign['endtime'])))
+            for crime in filteredSign['crimes']:
+                graph.add((URIRef(signURI), PARKSAFESIGN['near'], URIRef(self.base_uri + "/crimes/" + crime['rms_cdw_id'])))
+            
+            if format == ".rdf":
+                self.set_header("Content-Type", "application/rdf+xml")
+                self.write(graph.serialize())
+            elif format == ".nt":
+                self.set_header("Content-Type", "text/plain")
+                self.write(graph.serialize(format='nt'))
+            else:
+                self.set_header("Content-Type", "text/turtle")
+                self.write(graph.serialize(format='turtle')) 
         else:
             self.write_error(401, message="Format %s not supported" % format)
             
