@@ -5,6 +5,8 @@ from soclient import SoClient
 
 meters_per_degree = 111185.10693302986
 
+prefetch_buffer = 300
+
 
 class SocrataLookup:
 
@@ -44,7 +46,7 @@ class SocrataLookup:
                 return signs
         
         # Increase meters to pre-load cache
-        meters_new = meters + 100
+        meters_new = meters + prefetch_buffer
     
         cl = SoClient("data.seattle.gov", "it8u-sznv")
         
@@ -133,7 +135,7 @@ class SocrataLookup:
                 return crimes
         
         # Increase meters to pre-load cache
-        meters_new = meters + 100
+        meters_new = meters + prefetch_buffer
     
         cl = SoClient("data.seattle.gov", "7ais-f98f")
 

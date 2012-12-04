@@ -65,8 +65,8 @@ function activateSignMarker(id) {
 
 function activateCrimeMarker(id) {
 	marker = crime_markers[id];
-
-	if (active_marker != marker) {
+	
+	if (active_marker != marker && (active_marker == null || $.inArray(id, active_marker.nearby_crimes) == -1)) {
 		// Deactivate old sign markers
 		deactivateMarker();
 		
@@ -119,8 +119,9 @@ function addCrime(crime) {
 		// Add click event to marker
 		google.maps.event.addListener(marker, "click", function() {
 				activateCrimeMarker(crime.id);
+				$("#text_canvas").html(crime.description);
 				infowindow.setContent(crime.description);
-				infowindow.open(map, marker);	
+				//infowindow.open(map, marker);	
 		});	
 	}
 }
@@ -204,7 +205,7 @@ function querySign(id) {
 		type: "GET",
 		contentType: "application/json; charset=utf-8",
 		dataType: "json",
-		data: { meters: 100 },
+		data: { meters: max_crime_distance },
 		success: function(sign) {
 			active_marker.nearby_crimes = [];
 			$.each(sign.crimes, function(i, crime) {
@@ -212,8 +213,10 @@ function querySign(id) {
 				active_marker.nearby_crimes.push(crime.id);
 				activateCrimeScoreMarker(crime.id);
 			});
-            infowindow.setContent(sign.description + "<br>" + sign.latitude + " " + sign.longitude + "<br>Crime Score: " + sign.crime_score);
-			infowindow.open(map, sign_markers[sign.id]);	
+			var content = sign.description + "<br>" + sign.latitude + " " + sign.longitude + "<br>Crime Score: " + sign.crime_score
+			$("#text_canvas").html(content);
+            infowindow.setContent(content);
+			//infowindow.open(map, sign_markers[sign.id]);	
 		}
 	});
 }
@@ -237,7 +240,7 @@ function queryMap() {
 	center = map.getCenter();
 	lat = center.lat();
 	lon = center.lng();
-	meters = 300;
+	var meters = max_searchable_area;
 	
 	if (map.getBounds()) {
 		meters_per_degree = 111185.10693302986
@@ -249,7 +252,7 @@ function queryMap() {
 		x = (ne_lat - lat) * meters_per_degree;
 		y = (ne_lon - lon) * meters_per_degree;
 		
-		meters = Math.min(meters, Math.sqrt(x*x + y*y));
+		meters = Math.min(meters, Math.sqrt(x*x + y*y) * 0.85);
 	}
 	
 	querySigns(lat, lon, meters)
@@ -302,7 +305,9 @@ var img_crime_score = new google.maps.MarkerImage(
 	new google.maps.Point(8, 16),
 	new google.maps.Size(16,16)
 );
- 
+
+var max_searchable_area = 400;
+var max_crime_distance = 250;
 
 var map;
 var infowindow;
@@ -328,6 +333,7 @@ $(document).ready(function() {
 	$("#close").click(function() {
 		deactivateMarker();
 		infowindow.close();
+		$("#text_canvas").html("")
 	});
 	
 	// Add search here button
