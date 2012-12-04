@@ -37,7 +37,7 @@ function deactivateMarkers() {
 	});
 
 	// Deactivate crimes
-	$(crime_markers).each(function(i, marker) {
+	$.each(crime_markers, function(key, marker) {
 		marker.setIcon(img_crime);
 		marker.setZIndex(10);
 	});
@@ -119,10 +119,10 @@ function addSigns(signs) {
 
 function addCrimes(crimes) {
 	// Remove old crimes
-	$(crime_markers).each(function(i, crime_marker) {
+	$.each(crime_markers, function(key, crime_marker) {
 		crime_marker.setMap(null);
 	});
-	crime_markers = [];
+	crime_markers = {};
 
 	$(crimes).each(function(i, crime) {
 		// Create a marker for the sign	
@@ -132,11 +132,11 @@ function addCrimes(crimes) {
 			icon: img_crime,
 			zIndex: 10,
 		});
-		crime_markers.push(marker);
+		crime_markers[crime.rms_cdw_id] = marker;
 
 		// Add click event to marker
 		google.maps.event.addListener(marker, "click", function() {
-				activateCrimeMarker(i);
+				activateCrimeMarker(crime.rms_cdw_id);
 				infowindow.setContent(crime.description);
 				infowindow.open(map, marker);	
 		});	
@@ -275,7 +275,7 @@ var geocoder;
 var cur_pos;
 
 var sign_markers = [];
-var crime_markers = [];
+var crime_markers = {};
 
 var active_sign = -1;
 
