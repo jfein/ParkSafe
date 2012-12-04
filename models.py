@@ -44,12 +44,32 @@ class Sign(dict):
             crimeTime = 1 if crimeTime <= 0 else crimeTime
             crimeDist = math.sqrt((float(self.get('latitude'))-float(crime['latitude']))**2+(float(self.get('longitude'))-float(crime['longitude']))**2)*meters_per_degree
             crimeScore = crimeScore + math.exp(-1*crimeTime)*math.exp(-1*crimeDist)
-            #if (crimeScore <= 0):
         #print crimeScore
         crimeScoreLog= math.log10(crimeScore)
         #print "  " + str(crimeScoreLog)
         return crimeScoreLog + 100
-            
+
+    def crimeCount(self):
+        seconds_per_month = 2592000
+        time_stats = {}
+        time_stats['one_month'] = 0
+        time_stats['six_months'] = 0
+        time_stats['one_year'] = 0;
+        time_stats['greater_one_year'] = 0
+
+        for crime in self.get('crimes'):
+            crimeTime = time.time() - time.mktime(time.strptime(crime['date'], "%Y-%m-%dT%H:%M:%S"))
+            crimeTime = 0 if crimeTime < 0 else crimeTime
+            if crimeTime > (seconds_per_month*12):
+                time_stats['greater_one_year'] += 1
+            elif crimeTime > (seconds_per_month*6):
+                time_stats['one_year'] += 1
+            elif crimeTime > seconds_per_month:
+                time_stats['six_months'] += 1
+            else:
+                time_stats['one_month'] += 1
+        self['time_stats'] = time_stats
+        
         
 class Crime(dict):
     def __init__(self, soc_crime, base_uri):
