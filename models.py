@@ -1,5 +1,11 @@
 import time, math
 
+def log(x):
+    if x <= 0:
+        return float("-INF")
+    return math.log(x)
+
+
 class CrimeMeta(dict):
     def __init__(self, soc_crime, base_uri):
         self.update(
@@ -21,6 +27,8 @@ class SignMeta(dict):
                 uri=base_uri+"/signs/"+soc_sign['objectid']+".json"
         )
         
+        
+        
 class Sign(dict):
     def __init__(self, soc_sign, base_uri):
         self.update(
@@ -35,6 +43,10 @@ class Sign(dict):
                 crimes=soc_sign['crimes'],
                 uri=base_uri+"/signs/"+soc_sign['objectid']+".json"
         )
+
+        
+
+        
         
     def crimeScore(self):
         crimeScore = 0;
@@ -43,11 +55,9 @@ class Sign(dict):
             crimeTime = (time.time() - time.mktime(time.strptime(crime['date'], "%Y-%m-%dT%H:%M:%S")))/360000
             crimeTime = 1 if crimeTime <= 0 else crimeTime
             crimeDist = math.sqrt((float(self.get('latitude'))-float(crime['latitude']))**2+(float(self.get('longitude'))-float(crime['longitude']))**2)*meters_per_degree
-            crimeScore = crimeScore + math.exp(-1*crimeTime)*math.exp(-1*crimeDist)
-        #print crimeScore
-        crimeScoreLog= math.log10(crimeScore)
-        #print "  " + str(crimeScoreLog)
-        return crimeScoreLog + 100
+            crimeScore = crimeScore + math.exp(-1*crimeTime)*math.exp(-0.3*crimeDist)
+        crimeScoreLog= log(crimeScore)
+        return -1*crimeScoreLog
 
     def crimeCount(self):
         seconds_per_month = 2592000
