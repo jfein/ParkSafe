@@ -155,41 +155,50 @@ function addSigns(signs) {
 
 
 function addCrimes(crimes) {
-	// Remove old crimes
-	$.each(crime_markers, function(key, crime_marker) {
-		crime_marker.setMap(null);
-	});
-	crime_markers = {};
-
+    if (!crime_adding) {
+        alert("CLEAR!");
+        // Remove old crimes
+        $.each(crime_markers, function(key, crime_marker) {
+            crime_marker.setMap(null);
+        });
+        crime_markers = {};
+        crimes_displayed = {};
+    }
+    
     var compiledCrimes = {};
 	$(crimes).each(function(i, crime) {
         var key = crime.latitude + "," + crime.longitude;
-        if (key in compiledCrimes) {
-            // Combine the descriptions
-            if (!(crime.description.toLowerCase() in compiledCrimes[key].crimeCounts))
-                compiledCrimes[key].crimeCounts[crime.description.toLowerCase()] = 1;
-            else
-                compiledCrimes[key].crimeCounts[crime.description.toLowerCase()]++;
-            
-            compiledCrimes[key].totalCrimes++;
-            
-            // Update the dates
-            if (crime.date < compiledCrimes[key].mindate)
-                compiledCrimes[key].mindate = crime.date;
-            else if (crime.date > compiledCrimes[key].maxdate)
-                compiledCrimes[key].maxdate = crime.date;
-        }
-        else {
-            var curCrime = {};
-            curCrime.crimeCounts = {};
-            curCrime.crimeCounts[crime.description.toLowerCase()] = 1;
-            curCrime.totalCrimes = 1;
-            curCrime.mindate = crime.date;
-            curCrime.maxdate = crime.date;
-            curCrime.latitude = crime.latitude;
-            curCrime.longitude = crime.longitude;
-            curCrime.id = crime.id;
-            compiledCrimes[key] = curCrime;
+        if ((crime_adding && !(key in crimes_displayed)) || !crime_adding) {
+            if (key in compiledCrimes) {
+                crimes_displayed[key]++;
+                
+                // Combine the descriptions
+                if (!(crime.description.toLowerCase() in compiledCrimes[key].crimeCounts))
+                    compiledCrimes[key].crimeCounts[crime.description.toLowerCase()] = 1;
+                else
+                    compiledCrimes[key].crimeCounts[crime.description.toLowerCase()]++;
+                
+                compiledCrimes[key].totalCrimes++;
+                
+                // Update the dates
+                if (crime.date < compiledCrimes[key].mindate)
+                    compiledCrimes[key].mindate = crime.date;
+                else if (crime.date > compiledCrimes[key].maxdate)
+                    compiledCrimes[key].maxdate = crime.date;
+            }
+            else {
+                crimes_displayed[key] = 1;
+                var curCrime = {};
+                curCrime.crimeCounts = {};
+                curCrime.crimeCounts[crime.description.toLowerCase()] = 1;
+                curCrime.totalCrimes = 1;
+                curCrime.mindate = crime.date;
+                curCrime.maxdate = crime.date;
+                curCrime.latitude = crime.latitude;
+                curCrime.longitude = crime.longitude;
+                curCrime.id = crime.id;
+                compiledCrimes[key] = curCrime;
+            }
         }
 	});
     
@@ -243,10 +252,13 @@ function querySign(id) {
 		success: function(sign) {
 			// Make nearby crimes purple
 			active_marker.nearby_crimes = [];
+            crime_adding = true;
+            addCrimes(sign.crimes);
+            crime_adding = false;
 			$.each(sign.crimes, function(i, crime) {
-				addCrime(crime);
 				active_marker.nearby_crimes.push(crime.id);
-				activateCrimeScoreMarker(crime.id);
+                if (crime.id in crime_markers)
+                    activateCrimeScoreMarker(crime.id);
 			});
 			// Set content of crime
 			var content = "<b>" + sign.description + "</b><br>" + 
@@ -357,7 +369,9 @@ var cur_pos;
 
 var sign_markers = {};
 var crime_markers = {};
+var crimes_displayed = {};
 
+var crime_adding = false;
 var active_marker = null;
 var active_type = "";
 
