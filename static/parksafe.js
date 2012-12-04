@@ -113,7 +113,16 @@ function addCrime(crime) {
 		// Add click event to marker
 		google.maps.event.addListener(marker, "click", function() {
 				activateCrimeMarker(crime.id);
-				$("#text_canvas").html(crime.description);
+                var html = "<b>Crime Types:</b> ";
+                var keys = Object.keys(crime.crimeCounts);
+                $.each(keys, function(i, key) {
+                    html += key + " (" + crime.crimeCounts[key] + ")";
+                    if (i != keys.length-1)
+                        html += ", ";
+                });
+                html += "<br><b>Total # of Crimes:</b> " + crime.totalCrimes;
+                html += "<br><b>From:</b> " + crime.mindate + " <b>To:</b> " + crime.maxdate
+				$("#text_canvas").html(html);
 		});	
 	}
 }
@@ -152,9 +161,41 @@ function addCrimes(crimes) {
 	});
 	crime_markers = {};
 
+    var compiledCrimes = {};
 	$(crimes).each(function(i, crime) {
-		addCrime(crime);
+        var key = crime.latitude + "," + crime.longitude;
+        if (key in compiledCrimes) {
+            // Combine the descriptions
+            if (!(crime.description.toLowerCase() in compiledCrimes[key].crimeCounts))
+                compiledCrimes[key].crimeCounts[crime.description.toLowerCase()] = 1;
+            else
+                compiledCrimes[key].crimeCounts[crime.description.toLowerCase()]++;
+            
+            compiledCrimes[key].totalCrimes++;
+            
+            // Update the dates
+            if (crime.date < compiledCrimes[key].mindate)
+                compiledCrimes[key].mindate = crime.date;
+            else if (crime.date > compiledCrimes[key].maxdate)
+                compiledCrimes[key].maxdate = crime.date;
+        }
+        else {
+            var curCrime = {};
+            curCrime.crimeCounts = {};
+            curCrime.crimeCounts[crime.description.toLowerCase()] = 1;
+            curCrime.totalCrimes = 1;
+            curCrime.mindate = crime.date;
+            curCrime.maxdate = crime.date;
+            curCrime.latitude = crime.latitude;
+            curCrime.longitude = crime.longitude;
+            curCrime.id = crime.id;
+            compiledCrimes[key] = curCrime;
+        }
 	});
+    
+    $.each(compiledCrimes, function(key, crime) {
+        addCrime(crime);
+    });
 }
 
 
