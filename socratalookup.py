@@ -1,20 +1,18 @@
 import json
 import math
 from soclient import SoClient
+from geocache import GeoCache
 
 
 meters_per_degree = 111185.10693302986
 
-prefetch_buffer = 2
+prefetch_buffer = 1.25
 
 
 class SocrataLookup:
 
-    crimes_queries = {}
-    signs_queries = {}
-    
-    crimes = {}
-    signs = {}
+    crime_cache = GeoCache()
+    sign_cache = GeoCache()
 
     @classmethod
     def get_signs(cls, lat, lon, meters, filter_time=None):
@@ -22,28 +20,10 @@ class SocrataLookup:
         lon = float(lon)
         meters = float(meters)
         
-        # check if we can use cache
-        for (lat_q, lon_q, meters_q) in cls.signs_queries:
-            delta_lat = (lat_q - lat) * meters_per_degree
-            delta_lon = (lon_q - lon) * meters_per_degree
-            distance_btwn_centers = math.sqrt(delta_lat*delta_lat + delta_lon*delta_lon)     
-
-            # we have performed this query before
-            if (distance_btwn_centers + meters) <= meters_q:
-                degrees = meters / meters_per_degree
-                lat_min = lat - degrees
-                lat_max = lat + degrees
-                lon_min = lon - degrees
-                lon_max = lon + degrees
-                signs = []
-                for sign_id in cls.signs_queries[(lat_q, lon_q, meters_q)]:
-                    sign = cls.signs[sign_id]
-                    sign_lat = float(sign['latitude'])
-                    sign_lon = float(sign['longitude'])
-                    # crime from old query also matches this query
-                    if sign_lat >= lat_min and sign_lat <= lat_max and sign_lon >= lon_min and sign_lon <= lon_max:
-                        signs.append(sign)
-                return signs
+        # use cache
+        cached_res = cls.sign_cache.get_query(lat, lon, meters)
+        if cached_res:
+            return cached_res
         
         # Increase meters to pre-load cache
         meters_new = meters * prefetch_buffer
@@ -51,13 +31,12 @@ class SocrataLookup:
         cl = SoClient("data.seattle.gov", "it8u-sznv")
         
         degrees = meters_new / meters_per_degree
-
         lat_min = lat - degrees
         lat_max = lat + degrees
-
         lon_min = lon - degrees
         lon_max = lon + degrees
         
+        # Filter signs by time
         if filter_time:
             term = cl.AND(
                 cl.GREATER_THAN_OR_EQUALS(cl.COL("starttime"), cl.VAL(filter_time)),
@@ -82,27 +61,27 @@ class SocrataLookup:
         
         # Save to cache
         for d in data:
-            cls.signs[d['objectid']] = d
-        cls.signs_queries[(lat, lon, meters_new)] = [ d['objectid'] for d in data ]
+            cls.sign_cache.cache_data(d['objectid'], d)
+        cls.sign_cache.cache_query(lat, lon, meters_new, [ d['objectid'] for d in data ])
 
         # return the cached data
         return cls.get_signs(lat, lon, meters)
         
-        
     @classmethod
     def get_sign(cls, id):
         # use cache
-        if id in cls.signs:
-            return cls.signs[id]
+        cached_res = cls.sign_cache.get_data(id)
+        if cached_res:
+            return cached_res
             
-        # query and save to cache
+        # query
         cl = SoClient("data.seattle.gov", "it8u-sznv")
         data = cl.query(cl.EQUALS(cl.COL("objectid"), cl.VAL(id)))
         if not data:
             return None
             
         # save to cache
-        cls.signs[data[0]['objectid']] = data[0]
+        cls.sign_cache.cache_data(data[0]['objectid'], data[0])
         
         return data[0]
 
@@ -112,27 +91,10 @@ class SocrataLookup:
         lon = float(lon)
         meters = float(meters)
         
-        # check if we can use cache
-        for (lat_q, lon_q, meters_q) in cls.crimes_queries:
-            delta_lat = (lat_q - lat) * meters_per_degree
-            delta_lon = (lon_q - lon) * meters_per_degree
-            distance_btwn_centers = math.sqrt(delta_lat*delta_lat + delta_lon*delta_lon)            
-            # we have performed this query before
-            if (distance_btwn_centers + meters) <= meters_q:
-                degrees = meters / meters_per_degree
-                lat_min = lat - degrees
-                lat_max = lat + degrees
-                lon_min = lon - degrees
-                lon_max = lon + degrees
-                crimes = []
-                for crime_id in cls.crimes_queries[(lat_q, lon_q, meters_q)]:
-                    crime = cls.crimes[crime_id]
-                    crime_lat = float(crime['latitude'])
-                    crime_lon = float(crime['longitude'])
-                    # crime from old query also matches this query
-                    if crime_lat >= lat_min and crime_lat <= lat_max and crime_lon >= lon_min and crime_lon <= lon_max:
-                        crimes.append(crime)
-                return crimes
+        # use cache
+        cached_res = cls.crime_cache.get_query(lat, lon, meters)
+        if cached_res:
+            return cached_res
         
         # Increase meters to pre-load cache
         meters_new = meters * prefetch_buffer
@@ -193,17 +155,18 @@ class SocrataLookup:
         
         # Save to cache
         for d in data:
-            cls.crimes[d['rms_cdw_id']] = d
-        cls.crimes_queries[(lat, lon, meters_new)] = [ d['rms_cdw_id'] for d in data ]
-        
+            cls.crime_cache.cache_data(d['rms_cdw_id'], d)
+        cls.crime_cache.cache_query(lat, lon, meters_new, [ d['rms_cdw_id'] for d in data ])
+         
         # return the cached data
         return cls.get_crimes(lat, lon, meters)
                 
     @classmethod
     def get_crime(cls, id):
         # use cache
-        if id in cls.crimes:
-            return cls.crimes[id]
+        cached_res = cls.crime_cache.get_data(id)
+        if cached_res:
+            return cached_res
             
         # query and save to cache
         cl = SoClient("data.seattle.gov", "7ais-f98f")
@@ -212,6 +175,6 @@ class SocrataLookup:
             return None    
 
         # save to cache
-        cls.crimes[data[0]['rms_cdw_id']] = data[0]
+        cls.crime_cache.cache_data(data[0]['rms_cdw_id'], data[0])
         
         return data[0]

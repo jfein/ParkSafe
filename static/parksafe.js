@@ -22,16 +22,18 @@ function init() {
 
 
 function deactivateMarker() {
+	// Active marker is a lone CRIME
 	if (active_type == "CRIME") {
 		active_marker.setIcon(img_crime);
 		active_marker.setZIndex(10);
-	} else if (active_type == "SIGN") {
+	} 
+	// Active marker is a lone SIGN
+	else if (active_type == "SIGN") {
 		active_marker.setIcon(img_sign);
 		active_marker.setZIndex(10);
+		// Also deactivate nearby crimes
 		$.each(active_marker.nearby_crimes, function(i, id) {
-			if (id in crime_markers) {
-				crime_markers[id].setIcon(img_crime);
-			}
+			crime_markers[id].setIcon(img_crime);
 		});
 	}
 	
@@ -40,7 +42,7 @@ function deactivateMarker() {
 }
 
 
-function activateSignMarker(id) {
+function activateSignMarker(id, crimes) {
 	marker = sign_markers[id];
 
 	if (active_marker != marker) {
@@ -48,11 +50,26 @@ function activateSignMarker(id) {
 		deactivateMarker();
 		
 		// Activate this sign marker
-		sign_markers[id].setIcon(img_sign_active);
-		sign_markers[id].setZIndex(11);
+		marker.setIcon(img_sign_active);
+		marker.setZIndex(11);
 		
+		marker.nearby_crimes = [];
+		
+		// Make nearby crimes purple
+		$.each(crimes, function(i, crime) {
+			var crime_marker_id = addCrimeMarker(crime);
+			marker.nearby_crimes.push(crime_marker_id);
+			activateCrimeScoreMarker(crime_marker_id);
+		});
+		
+		// Set this as active marker
 		active_marker = marker;
 		active_type = "SIGN";
+	}
+	else {
+		// Deactivate active crime score marker
+		activateCrimeScoreMarker(active_marker.active_crime);
+		active_marker.active_crime = null;
 	}
 }
 
@@ -60,14 +77,15 @@ function activateSignMarker(id) {
 function activateCrimeMarker(id) {
 	marker = crime_markers[id];
 	
-	if (active_marker != marker && (active_marker == null || $.inArray(id, active_marker.nearby_crimes) == -1)) {
+	if (active_marker != marker) {
 		// Deactivate old sign markers
 		deactivateMarker();
 		
 		// Activate this sign marker
 		crime_markers[id].setIcon(img_crime_active);
 		crime_markers[id].setZIndex(11);
-		
+
+		// Set this as active marker		
 		active_marker = marker;
 		active_type = "CRIME";
 	}
@@ -78,67 +96,41 @@ function activateCrimeScoreMarker(id) {
 	crime_markers[id].setIcon(img_crime_score);
 }
 
+function activateActiveCrimeScoreMarker(id) {
+	if (active_marker.active_crime != null)
+		activateCrimeScoreMarker(active_marker.active_crime);
+	crime_markers[id].setIcon(img_crime_score_active);
+	active_marker.active_crime = id;
+}
 
-function addSign(sign) {
-	if (!(sign.id in sign_markers)) {
+
+function addSignMarker(sign_id, lat, lon, text) {
+	var marker_id = lat + ":" + lon;
+	if (!(marker_id in sign_markers)) {
 		// Create a marker for the sign	
 		var marker = new google.maps.Marker({
-			position: new google.maps.LatLng(sign.latitude , sign.longitude),
+			position: new google.maps.LatLng(lat , lon),
 			map: map,
 			icon: img_sign,
 			zIndex: 10,
 		});
-		sign_markers[sign.id] = marker;
+		marker.text = text;
+		sign_markers[marker_id] = marker;
 
 		// Add click event to marker
 		google.maps.event.addListener(marker, "click", function() {
-				activateSignMarker(sign.id);
-				querySign(sign.id);				
+				querySign(sign_id);				
 		});
 	}
+	return marker_id;
 }
 
 
-function addCrime(crime) {
-	if (!(crime.id in crime_markers)) {
-		// Create a marker for the sign	
-		var marker = new google.maps.Marker({
-			position: new google.maps.LatLng(crime.latitude , crime.longitude),
-			map: map,
-			icon: img_crime,
-			zIndex: 10,
-		});
-		crime_markers[crime.id] = marker;
-
-		// Add click event to marker
-		google.maps.event.addListener(marker, "click", function() {
-				activateCrimeMarker(crime.id);
-                var html = "<b>Crime Types:</b> ";
-                var keys = Object.keys(crime.crimeCounts);
-                $.each(keys, function(i, key) {
-                    html += key + " (" + crime.crimeCounts[key] + ")";
-                    if (i != keys.length-1)
-                        html += ", ";
-                });
-                html += "<br><b>Total # of Crimes:</b> " + crime.totalCrimes;
-                html += "<br><b>From:</b> " + crime.mindate + " <b>To:</b> " + crime.maxdate
-				$("#text_canvas").html(html);
-		});	
-	}
-}
-
-
-function addSigns(signs) {
-	// Remove old signs
-	$.each(sign_markers, function(key, sign_markers) {
-		sign_markers.setMap(null);
-	});
-	sign_markers = {};
-
-	// Aggregate signs at same location
+function aggregateSigns(signs) {
     var compiledSigns = {};
     $(signs).each(function(i, sign) {
         var key = sign.latitude + "," + sign.longitude;
+		// Seen the key before
         if (key in compiledSigns) {
 			if (compiledSigns[key].description.indexOf(sign.description) == -1)
 				compiledSigns[key].description += ("<BR>" + sign.description);
@@ -147,63 +139,147 @@ function addSigns(signs) {
             compiledSigns[key] = sign;
         }
     });
+	
+	return compiledSigns;
+}
 
-    $.each(compiledSigns, function(key,sign) {
-		addSign(sign)
+
+function addSigns(signs) {
+	// Remove old sign markers
+	$.each(sign_markers, function(key, sign_markers) {
+		sign_markers.setMap(null);
+	});
+	sign_markers = {};
+
+	// Aggregate signs at same location
+	signs = aggregateSigns(signs);
+	
+	// Place a marker for each distinct sign location
+    $.each(signs, function(key,sign) {
+		addSignMarker(sign.id, sign.latitude, sign.longitude, sign.description)
 	});
 }
 
 
-function addCrimes(crimes) {
-    if (!crime_adding) {
-        // Remove old crimes
-        $.each(crime_markers, function(key, crime_marker) {
-            crime_marker.setMap(null);
-        });
-        crime_markers = {};
-        crimes_displayed = {};
-    }
-    
+function addCrimeMarker(crime) {
+	var marker_id = crime.latitude + ":" + crime.longitude;
+	if (!(marker_id in crime_markers)) {
+			// Create a marker for the sign	
+		var marker = new google.maps.Marker({
+			position: new google.maps.LatLng(crime.latitude , crime.longitude),
+			map: map,
+			icon: img_crime,
+			zIndex: 10,
+		});
+		crime_markers[marker_id] = marker;
+
+		// Add click event to marker
+		google.maps.event.addListener(marker, "click", function() {
+				activateCrime(crime);
+		});
+	}
+	return marker_id;
+}
+
+
+function aggregateCrimes(crimes) {
     var compiledCrimes = {};
-	$(crimes).each(function(i, crime) {
+    $(crimes).each(function(i, crime) {
         var key = crime.latitude + "," + crime.longitude;
-        if ((crime_adding && !(key in crimes_displayed)) || !crime_adding) {
-            if (key in compiledCrimes) {
-                crimes_displayed[key]++;
-                
-                // Combine the descriptions
-                if (!(crime.description.toLowerCase() in compiledCrimes[key].crimeCounts))
-                    compiledCrimes[key].crimeCounts[crime.description.toLowerCase()] = 1;
-                else
-                    compiledCrimes[key].crimeCounts[crime.description.toLowerCase()]++;
-                
-                compiledCrimes[key].totalCrimes++;
-                
-                // Update the dates
-                if (crime.date < compiledCrimes[key].mindate)
-                    compiledCrimes[key].mindate = crime.date;
-                else if (crime.date > compiledCrimes[key].maxdate)
-                    compiledCrimes[key].maxdate = crime.date;
-            }
-            else {
-                crimes_displayed[key] = 1;
-                var curCrime = {};
-                curCrime.crimeCounts = {};
-                curCrime.crimeCounts[crime.description.toLowerCase()] = 1;
-                curCrime.totalCrimes = 1;
-                curCrime.mindate = crime.date;
-                curCrime.maxdate = crime.date;
-                curCrime.latitude = crime.latitude;
-                curCrime.longitude = crime.longitude;
-                curCrime.id = crime.id;
-                compiledCrimes[key] = curCrime;
-            }
+		// Seen the key before
+        if (key in compiledCrimes) {
+			// Combine the descriptions
+			if (!(crime.description.toLowerCase() in compiledCrimes[key].crimeCounts))
+				compiledCrimes[key].crimeCounts[crime.description.toLowerCase()] = 1;
+			else
+				compiledCrimes[key].crimeCounts[crime.description.toLowerCase()]++;
+			
+			compiledCrimes[key].totalCrimes++;
+			
+			// Update the dates
+			if (crime.date < compiledCrimes[key].mindate)
+				compiledCrimes[key].mindate = crime.date;
+			else if (crime.date > compiledCrimes[key].maxdate)
+				compiledCrimes[key].maxdate = crime.date;
         }
-	});
-    
-    $.each(compiledCrimes, function(key, crime) {
-        addCrime(crime);
+		// New crime at that location
+        else {
+			var curCrime = {};
+			curCrime.crimeCounts = {};
+			curCrime.crimeCounts[crime.description.toLowerCase()] = 1;
+			curCrime.totalCrimes = 1;
+			curCrime.mindate = crime.date;
+			curCrime.maxdate = crime.date;
+			curCrime.latitude = crime.latitude;
+			curCrime.longitude = crime.longitude;
+			curCrime.id = crime.id;
+			compiledCrimes[key] = curCrime;
+        }
     });
+	
+	return compiledCrimes;
+}
+
+
+function addCrimes(crimes) {
+	// Remove old crimes
+	$.each(crime_markers, function(key, crime_marker) {
+		crime_marker.setMap(null);
+	});
+	crime_markers = {};
+	
+	
+	// Aggregate crimes to crimes in same location
+	crimes = aggregateCrimes(crimes)
+
+	// Add each crime marker to the map
+    $.each(crimes, function(key, crime) {
+        addCrimeMarker(crime);
+    });
+}
+
+
+function activateCrime(crime) {
+	var marker_id = crime.latitude + ":" + crime.longitude;
+	
+	// Make crime marker bright red
+	if (!(active_type == "SIGN" && $.inArray(marker_id, active_marker.nearby_crimes) != -1))
+		activateCrimeMarker(marker_id);
+	// Make crime marker bright purple
+	else
+		activateActiveCrimeScoreMarker(marker_id);
+
+	// Set content of the text canvas
+	var html = "<b>Crime Types:</b> ";
+	var keys = Object.keys(crime.crimeCounts);
+	$.each(keys, function(i, key) {
+		html += key + " (" + crime.crimeCounts[key] + ")";
+		if (i != keys.length-1)
+			html += ", ";
+	});
+	html += "<br><b>Total # of Crimes:</b> " + crime.totalCrimes;
+	html += "<br><b>From:</b> " + crime.mindate + " <b>To:</b> " + crime.maxdate
+	$("#text_canvas").html(html);
+}
+
+
+function activateSign(sign) {
+	var marker_id = sign.latitude + ":" + sign.longitude;
+	
+	// Make sign and crime markers active
+	crimes = aggregateCrimes(sign.crimes);
+	activateSignMarker(marker_id, crimes);
+	
+	// Set content of text canvas
+	var content = "<b>" + active_marker.text + "</b><br>" + 
+		"<u>Safety Rating: " + Number((sign.crime_score).toFixed(2)) + "</u><br>" +
+		"<table>" +
+		"<tr><td># crimes within 1 month:</td><td>" + sign.crime_time_stats.one_month + "</td></tr>" +
+		"<tr><td># crimes between 1 and 6 months:</td><td>" + sign.crime_time_stats.six_months + "</td></tr>" +
+		"<tr><td># crimes between 6 months and 1 year:</td><td>" + sign.crime_time_stats.one_year + "</td></tr>" +
+		"<tr><td># crimes over 1 year ago:</td><td>" + sign.crime_time_stats.greater_one_year + "</td></tr>" +
+		"</table>";
+	$("#text_canvas").html(content);
 }
 
 
@@ -223,6 +299,9 @@ function codeAddress() {
 
 
 function querySigns(lat, lon, meters) {
+	$('#overlay').fadeIn();
+	queries_in_flight += 1;
+
 	var data = { "lat" : lat , "lon" : lon , "meters" : meters };
 	if ($("#filter_time").is(":checked")) {
 		data['filter_time'] = "True";
@@ -235,6 +314,11 @@ function querySigns(lat, lon, meters) {
 		dataType: "json",
 		data: data,
 		success: function(signs) {
+			queries_in_flight -= 1;
+			if (queries_in_flight == 0) {
+				$('#overlay').stop();
+				$('#overlay').hide();
+			}
 			addSigns(signs);
 		}
 	});
@@ -242,6 +326,9 @@ function querySigns(lat, lon, meters) {
 
 
 function querySign(id) {
+	$('#overlay').fadeIn();
+	queries_in_flight += 1;
+
 	$.ajax({
 		url: 'signs/' + id + '.json',
 		type: "GET",
@@ -249,32 +336,21 @@ function querySign(id) {
 		dataType: "json",
 		data: { meters: max_crime_distance },
 		success: function(sign) {
-			// Make nearby crimes purple
-			active_marker.nearby_crimes = [];
-            crime_adding = true;
-            addCrimes(sign.crimes);
-            crime_adding = false;
-			$.each(sign.crimes, function(i, crime) {
-				active_marker.nearby_crimes.push(crime.id);
-                if (crime.id in crime_markers)
-                    activateCrimeScoreMarker(crime.id);
-			});
-			// Set content of crime
-			var content = "<b>" + sign.description + "</b><br>" + 
-				"<u>Safety Rating: " + Number((sign.crime_score).toFixed(2)) + "</u><br>" +
-				"<table>" +
-				"<tr><td># crimes within 1 month:</td><td>" + sign.crime_time_stats.one_month + "</td></tr>" +
-				"<tr><td># crimes between 1 and 6 months:</td><td>" + sign.crime_time_stats.six_months + "</td></tr>" +
-				"<tr><td># crimes between 6 months and 1 year:</td><td>" + sign.crime_time_stats.one_year + "</td></tr>" +
-				"<tr><td># crimes over 1 year ago:</td><td>" + sign.crime_time_stats.greater_one_year + "</td></tr>" +
-				"</table>";
-			$("#text_canvas").html(content);
+			queries_in_flight -= 1;
+			if (queries_in_flight == 0) {
+				$('#overlay').stop();
+				$('#overlay').hide();
+			}
+			activateSign(sign);
 		}
 	});
 }
 
 
 function queryCrimes(lat, lon, meters) {
+	$('#overlay').fadeIn();
+	queries_in_flight += 1;
+	
 	$.ajax({
 		url: 'crimes.json',
 		type: "GET",
@@ -282,6 +358,11 @@ function queryCrimes(lat, lon, meters) {
 		dataType: "json",
 		data: { "lat" : lat , "lon" : lon , "meters" : meters },
 		success: function(crimes) {
+			queries_in_flight -= 1;
+			if (queries_in_flight == 0) {
+				$('#overlay').stop();
+				$('#overlay').hide();
+			}
 			addCrimes(crimes);
 		}
 	});
@@ -304,7 +385,7 @@ function queryMap() {
 		x = (ne_lat - lat) * meters_per_degree;
 		y = (ne_lon - lon) * meters_per_degree;
 		
-		meters = Math.min(meters, Math.sqrt(x*x + y*y) * 0.85);
+		meters = Math.min(meters, Math.sqrt(x*x + y*y));
 	}
 	querySigns(lat, lon, meters)
 	queryCrimes(lat, lon, meters)
@@ -357,6 +438,14 @@ var img_crime_score = new google.maps.MarkerImage(
 	new google.maps.Size(16,16)
 );
 
+var img_crime_score_active = new google.maps.MarkerImage(
+	"static/images/crime_score_active.png",
+	new google.maps.Size(223, 223),
+	new google.maps.Point(0,0),
+	new google.maps.Point(8, 16),
+	new google.maps.Size(16,16)
+);
+
 var max_searchable_area = 300;
 var max_crime_distance = 250;
 
@@ -367,11 +456,11 @@ var cur_pos;
 
 var sign_markers = {};
 var crime_markers = {};
-var crimes_displayed = {};
 
-var crime_adding = false;
 var active_marker = null;
 var active_type = "";
+
+var queries_in_flight = 0;
 
 
 $(document).ready(function() {
