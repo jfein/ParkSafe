@@ -78,7 +78,7 @@ class Sign(dict):
                 time_stats['six_months'] += 1
             else:
                 time_stats['one_month'] += 1
-        self['time_stats'] = time_stats
+        self['crime_time_stats'] = time_stats
         
         
 class Crime(dict):

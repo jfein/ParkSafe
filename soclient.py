@@ -90,6 +90,9 @@ class SoClient:
             }
         )
         
+        if not res:
+            return []
+            
         rows = res["data"]
         if not rows:
             return []

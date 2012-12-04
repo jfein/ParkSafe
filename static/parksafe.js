@@ -18,14 +18,6 @@ function init() {
 	
 	// set up geocoder
 	geocoder = new google.maps.Geocoder();
-	
-	// Set up info window
-	infowindow = new google.maps.InfoWindow(
-		{ pixelOffset: new google.maps.Size(-100,10) }
-	);
-	google.maps.event.addListener(infowindow, 'closeclick', function() {
-			deactivateMarker();
-	});
 }
 
 
@@ -37,7 +29,9 @@ function deactivateMarker() {
 		active_marker.setIcon(img_sign);
 		active_marker.setZIndex(10);
 		$.each(active_marker.nearby_crimes, function(i, id) {
-			crime_markers[id].setIcon(img_crime);
+			if (id in crime_markers) {
+				crime_markers[id].setIcon(img_crime);
+			}
 		});
 	}
 	
@@ -120,8 +114,6 @@ function addCrime(crime) {
 		google.maps.event.addListener(marker, "click", function() {
 				activateCrimeMarker(crime.id);
 				$("#text_canvas").html(crime.description);
-				infowindow.setContent(crime.description);
-				//infowindow.open(map, marker);	
 		});	
 	}
 }
@@ -173,6 +165,7 @@ function codeAddress() {
 		function(results, status) {
 			if (status == google.maps.GeocoderStatus.OK) {
 				map.setCenter(results[0].geometry.location);
+				queryMap();
 			} else {
 				alert("Geocode was not successful for the following reason: " + status);
 			}
@@ -207,16 +200,23 @@ function querySign(id) {
 		dataType: "json",
 		data: { meters: max_crime_distance },
 		success: function(sign) {
+			// Make nearby crimes purple
 			active_marker.nearby_crimes = [];
 			$.each(sign.crimes, function(i, crime) {
 				addCrime(crime);
 				active_marker.nearby_crimes.push(crime.id);
 				activateCrimeScoreMarker(crime.id);
 			});
-			var content = sign.description + "<br>" + sign.latitude + " " + sign.longitude + "<br>Crime Score: " + sign.crime_score
+			// Set content of crime
+			var content = "<b>" + sign.description + "</b><br>" + 
+				"<u>Safety Rating: " + Number((sign.crime_score).toFixed(2)) + "</u><br>" +
+				"<table>" +
+				"<tr><td># crimes within 1 month:</td><td>" + sign.crime_time_stats.one_month + "</td></tr>" +
+				"<tr><td># crimes between 1 and 6 months:</td><td>" + sign.crime_time_stats.six_months + "</td></tr>" +
+				"<tr><td># crimes between 6 months and 1 year:</td><td>" + sign.crime_time_stats.one_year + "</td></tr>" +
+				"<tr><td># crimes over 1 year ago:</td><td>" + sign.crime_time_stats.greater_one_year + "</td></tr>" +
+				"</table>";
 			$("#text_canvas").html(content);
-            infowindow.setContent(content);
-			//infowindow.open(map, sign_markers[sign.id]);	
 		}
 	});
 }
@@ -306,11 +306,10 @@ var img_crime_score = new google.maps.MarkerImage(
 	new google.maps.Size(16,16)
 );
 
-var max_searchable_area = 400;
+var max_searchable_area = 300;
 var max_crime_distance = 250;
 
 var map;
-var infowindow;
 var geocoder;
 
 var cur_pos;
@@ -332,7 +331,6 @@ $(document).ready(function() {
 	// Add close button
 	$("#close").click(function() {
 		deactivateMarker();
-		infowindow.close();
 		$("#text_canvas").html("")
 	});
 	
