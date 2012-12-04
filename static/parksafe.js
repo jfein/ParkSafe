@@ -24,62 +24,112 @@ function init() {
 		{ pixelOffset: new google.maps.Size(-100,10) }
 	);
 	google.maps.event.addListener(infowindow, 'closeclick', function() {
-			deactivateMarkers();
+			deactivateMarker();
 	});
 }
 
 
-function deactivateMarkers() {
-	// Deactivate signs
-	$(sign_markers).each(function(i, marker) {
-		marker.setIcon(img_sign);
-		marker.setZIndex(10);
-	});
-
-	// Deactivate crimes
-	$.each(crime_markers, function(key, marker) {
-		marker.setIcon(img_crime);
-		marker.setZIndex(10);
-	});
+function deactivateMarker() {
+	if (active_type == "CRIME") {
+		active_marker.setIcon(img_crime);
+		active_marker.setZIndex(10);
+	} else if (active_type == "SIGN") {
+		active_marker.setIcon(img_sign);
+		active_marker.setZIndex(10);
+		$.each(active_marker.nearby_crimes, function(i, id) {
+			crime_markers[id].setIcon(img_crime);
+		});
+	}
 	
-	active_sign = -1;
+	active_marker = null;
+	active_type = "";
 }
 
 
 function activateSignMarker(id) {
-	if (active_sign != id) {
+	marker = sign_markers[id];
+
+	if (active_marker != marker) {
 		// Deactivate old sign markers
-		deactivateMarkers();
+		deactivateMarker();
 		
 		// Activate this sign marker
 		sign_markers[id].setIcon(img_sign_active);
 		sign_markers[id].setZIndex(11);
 		
-		active_sign = id;
+		active_marker = marker;
+		active_type = "SIGN";
 	}
 }
 
 
 function activateCrimeMarker(id) {
-	if (active_sign != id) {
+	marker = crime_markers[id];
+
+	if (active_marker != marker) {
 		// Deactivate old sign markers
-		deactivateMarkers();
+		deactivateMarker();
 		
 		// Activate this sign marker
 		crime_markers[id].setIcon(img_crime_active);
 		crime_markers[id].setZIndex(11);
 		
-		active_sign = id;
+		active_marker = marker;
+		active_type = "CRIME";
 	}
+}
+
+
+function activateCrimeScoreMarker(id) {
+	crime_markers[id].setIcon(img_crime_score);
+}
+
+
+function addSign(sign) {
+	// Create a marker for the sign	
+	var marker = new google.maps.Marker({
+		position: new google.maps.LatLng(sign.latitude , sign.longitude),
+		map: map,
+		icon: img_sign,
+		zIndex: 10,
+	});
+	sign_markers[sign.id] = marker;
+
+	// Add click event to marker
+	google.maps.event.addListener(marker, "click", function() {
+			activateSignMarker(sign.id);
+			querySign(sign.id);
+			infowindow.setContent(sign.description + "<br>" + sign.latitude + " " + sign.longitude);
+			infowindow.open(map, marker);				
+	});
+}
+
+
+function addCrime(crime) {
+	// Create a marker for the sign	
+	var marker = new google.maps.Marker({
+		position: new google.maps.LatLng(crime.latitude , crime.longitude),
+		map: map,
+		icon: img_crime,
+		zIndex: 10,
+	});
+	crime_markers[crime.id] = marker;
+
+	// Add click event to marker
+	google.maps.event.addListener(marker, "click", function() {
+			activateCrimeMarker(crime.id);
+			infowindow.setContent(crime.description);
+			infowindow.open(map, marker);	
+	});	
 }
 
 
 function addSigns(signs) {
 	// Remove old signs
-	$(sign_markers).each(function(i, sign_marker) {
-		sign_marker.setMap(null);
+	$.each(sign_markers, function(key, sign_markers) {
+		sign_markers.setMap(null);
 	});
-	sign_markers = [];
+	sign_markers = {};
 
 	// Aggregate signs at same location
     var compiledSigns = {};
@@ -95,24 +145,7 @@ function addSigns(signs) {
     });
 
     $.each(compiledSigns, function(key,sign) {
-		// Create a marker for the sign	
-		var marker = new google.maps.Marker({
-			position: new google.maps.LatLng(sign.latitude , sign.longitude),
-			map: map,
-			icon: img_sign,
-			zIndex: 10,
-		});
-		sign_markers.push(marker);
-		
-		var id = sign_markers.length - 1;
-
-		// Add click event to marker
-		google.maps.event.addListener(marker, "click", function() {
-				activateSignMarker(id);
-				querySign(sign.id);
-				infowindow.setContent(sign.description + "<br>" + sign.latitude + " " + sign.longitude);
-				infowindow.open(map, marker);				
-		});
+		addSign(sign)
 	});
 }
 
@@ -125,21 +158,7 @@ function addCrimes(crimes) {
 	crime_markers = {};
 
 	$(crimes).each(function(i, crime) {
-		// Create a marker for the sign	
-		var marker = new google.maps.Marker({
-			position: new google.maps.LatLng(crime.latitude , crime.longitude),
-			map: map,
-			icon: img_crime,
-			zIndex: 10,
-		});
-		crime_markers[crime.rms_cdw_id] = marker;
-
-		// Add click event to marker
-		google.maps.event.addListener(marker, "click", function() {
-				activateCrimeMarker(crime.rms_cdw_id);
-				infowindow.setContent(crime.description);
-				infowindow.open(map, marker);	
-		});	
+		addCrime(crime);
 	});
 }
 
@@ -183,9 +202,16 @@ function querySign(id) {
 		type: "GET",
 		contentType: "application/json; charset=utf-8",
 		dataType: "json",
-		data: { meters: 50 },
+		data: { meters: 100 },
 		success: function(sign) {
-			var x = 0;
+			active_marker.nearby_crimes = [];
+			$.each(sign.crimes, function(i, crime) {
+				if (!(crime.id in crime_markers)) {
+					addCrime(crime);
+				}
+				active_marker.nearby_crimes.push(crime.id);
+				activateCrimeScoreMarker(crime.id);
+			});
 		}
 	});
 }
@@ -266,6 +292,14 @@ var img_crime_active = new google.maps.MarkerImage(
 	new google.maps.Point(8, 16),
 	new google.maps.Size(16,16)
 );
+
+var img_crime_score = new google.maps.MarkerImage(
+	"static/images/crime_score.png",
+	new google.maps.Size(223, 223),
+	new google.maps.Point(0,0),
+	new google.maps.Point(8, 16),
+	new google.maps.Size(16,16)
+);
  
 
 var map;
@@ -274,10 +308,11 @@ var geocoder;
 
 var cur_pos;
 
-var sign_markers = [];
+var sign_markers = {};
 var crime_markers = {};
 
-var active_sign = -1;
+var active_marker = null;
+var active_type = "";
 
 
 $(document).ready(function() {
@@ -289,7 +324,7 @@ $(document).ready(function() {
 	
 	// Add close button
 	$("#close").click(function() {
-		deactivateMarkers();
+		deactivateMarker();
 		infowindow.close();
 	});
 	

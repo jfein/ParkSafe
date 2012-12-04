@@ -2,13 +2,14 @@ import httplib
 import json
 import time
 
-conns = {}
-
 class SoClient:
     '''
     Client class to interface with a socrata data source.
     Not threadsafe.
     '''
+    
+    conns = {}
+    cols = {}
 
     def __init__(self, host, view_id):
         self.host = host
@@ -16,14 +17,12 @@ class SoClient:
         self.cols = self._get_columns()
         
     def get_conn(self):
-        global conns
-        if self.host not in conns:
-            conns[self.host] = httplib.HTTPConnection(self.host)
-        return conns[self.host]
+        if self.host not in SoClient.conns:
+            SoClient.conns[self.host] = httplib.HTTPConnection(self.host)
+        return SoClient.conns[self.host]
         
     def remove_conn(self):
-        global conns
-        del(conns[self.host])
+        del(SoClient.conns[self.host])
         
     # Calls socrata API
     # Will crash if error
@@ -37,6 +36,7 @@ class SoClient:
             conn = self.get_conn()
             
             jsonData = json.dumps(data)
+            print "\tCALLING SOCRATA"
             conn.request(method, uri, jsonData, headers)
             
             response = conn.getresponse()
@@ -56,10 +56,17 @@ class SoClient:
             self._call_api(method, uri, data, headers)
             
     def _get_columns(self):
-        return self._call_api(
+        if self.view_id in SoClient.cols:
+            return SoClient.cols[self.view_id]
+            
+        cols = self._call_api(
             method="GET",
             uri="/api/views/" + self.view_id + "/columns.json"
         ) 
+        
+        SoClient.cols[self.view_id] = cols
+        
+        return cols
         
     def _get_col_id(self, name):
         for col in self.cols:

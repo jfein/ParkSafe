@@ -1,9 +1,16 @@
 import json
+import math
 from soclient import SoClient
+
+
+meters_per_degree = 111185.10693302986
 
 
 class SocrataLookup:
 
+    crimes_queries = {}
+    signs_queries = []
+    
     crimes = {}
     signs = {}
 
@@ -15,7 +22,6 @@ class SocrataLookup:
     
         cl = SoClient("data.seattle.gov", "it8u-sznv")
         
-        meters_per_degree = 111185.10693302986
         degrees = meters / meters_per_degree
 
         lat_min = lat - degrees
@@ -56,6 +62,7 @@ class SocrataLookup:
     def get_sign(cls, id):
         # use cache
         if id in cls.signs:
+            print "USING SIGN CACHE"
             return cls.signs[id]
             
         # query and save to cache
@@ -71,18 +78,43 @@ class SocrataLookup:
 
     @classmethod
     def get_crimes(cls, lat, lon, meters):
+        lat = float(lat)
+        lon = float(lon)
+        meters = float(meters)
+        
+        # check if we can use cache
+        for (lat_q, lon_q, meters_q) in cls.crimes_queries:
+            delta_lat = (lat_q - lat) * meters_per_degree
+            delta_lon = (lon_q - lon) * meters_per_degree
+            distance_btwn_centers = math.sqrt(delta_lat*delta_lat + delta_lon*delta_lon)            
+            # we have performed this query before
+            if (distance_btwn_centers + meters) <= meters_q:
+                print "USING CRIME GEO CACHE"
+                degrees = meters / meters_per_degree
+                lat_min = lat - degrees
+                lat_max = lat + degrees
+                lon_min = lon - degrees
+                lon_max = lon + degrees
+                crimes = []
+                for crime_id in cls.crimes_queries[(lat_q, lon_q, meters_q)]:
+                    crime = cls.crimes[crime_id]
+                    crime_lat = float(crime['latitude'])
+                    crime_lon = float(crime['longitude'])
+                    # crime from old query also matches this query
+                    if crime_lat >= lat_min and crime_lat <= lat_max and crime_lon >= lon_min and crime_lon <= lon_max:
+                        crimes.append(crime)
+                return crimes
+    
         cl = SoClient("data.seattle.gov", "7ais-f98f")
 
         data = cl.query(
             cl.AND(
                 cl.OR(
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("THEFT-CARPROWL")),
-                    cl.EQUALS(cl.COL("offense_type"), cl.VAL("THEFT-OTH")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("VEH-THEFT-AUTO")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("BURGLARY-FORCE-RES")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("ASSLT-NONAGG")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("WARRARR-FELONY")),
-                    cl.EQUALS(cl.COL("offense_type"), cl.VAL("DISTURBANCE-OTH")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("BURGLARY-NOFORCE-RES")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("BURGLARY-FORCE-NONRES")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("THEFT-AUTOACC")),
@@ -130,6 +162,7 @@ class SocrataLookup:
         # Save to cache
         for d in data:
             cls.crimes[d['rms_cdw_id']] = d
+        cls.crimes_queries[(lat, lon, meters)] = [ d['rms_cdw_id'] for d in data ]
         
         return data
                 

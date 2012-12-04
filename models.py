@@ -5,7 +5,7 @@ class CrimeMeta(dict):
                 id=soc_crime['rms_cdw_id'], 
                 latitude=soc_crime['latitude'], 
                 longitude=soc_crime['longitude'], 
-                description=soc_crime['summarized_offense_description'],  
+                description=soc_crime['summarized_offense_description'],
                 uri=base_uri+"/crimes/"+soc_crime['rms_cdw_id']+".json"
         )
         
@@ -41,7 +41,7 @@ class Crime(dict):
                 latitude=soc_crime['latitude'], 
                 longitude=soc_crime['longitude'], 
                 description=soc_crime['summarized_offense_description'],
-                type=soc_crimep['offense_type'],
+                type=soc_crime['offense_type'],
                 date=soc_crime['occurred_date_or_date_range_start'],
                 block=soc_crime['hundred_block_location'],
                 uri=base_uri+"/crimes/"+soc_crime['rms_cdw_id']+".json",
