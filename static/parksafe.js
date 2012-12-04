@@ -156,7 +156,6 @@ function addSigns(signs) {
 
 function addCrimes(crimes) {
     if (!crime_adding) {
-        alert("CLEAR!");
         // Remove old crimes
         $.each(crime_markers, function(key, crime_marker) {
             crime_marker.setMap(null);
@@ -307,9 +306,8 @@ function queryMap() {
 		
 		meters = Math.min(meters, Math.sqrt(x*x + y*y) * 0.85);
 	}
-	
 	querySigns(lat, lon, meters)
-	queryCrimes(lat, lon, meters)	
+	queryCrimes(lat, lon, meters)
 }
 
 
