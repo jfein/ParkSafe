@@ -86,39 +86,43 @@ function activateCrimeScoreMarker(id) {
 
 
 function addSign(sign) {
-	// Create a marker for the sign	
-	var marker = new google.maps.Marker({
-		position: new google.maps.LatLng(sign.latitude , sign.longitude),
-		map: map,
-		icon: img_sign,
-		zIndex: 10,
-	});
-	sign_markers[sign.id] = marker;
+	if (!(sign.id in sign_markers)) {
+		// Create a marker for the sign	
+		var marker = new google.maps.Marker({
+			position: new google.maps.LatLng(sign.latitude , sign.longitude),
+			map: map,
+			icon: img_sign,
+			zIndex: 10,
+		});
+		sign_markers[sign.id] = marker;
 
-	// Add click event to marker
-	google.maps.event.addListener(marker, "click", function() {
-			activateSignMarker(sign.id);
-			querySign(sign.id);			
-	});
+		// Add click event to marker
+		google.maps.event.addListener(marker, "click", function() {
+				activateSignMarker(sign.id);
+				querySign(sign.id);				
+		});
+	}
 }
 
 
 function addCrime(crime) {
-	// Create a marker for the sign	
-	var marker = new google.maps.Marker({
-		position: new google.maps.LatLng(crime.latitude , crime.longitude),
-		map: map,
-		icon: img_crime,
-		zIndex: 10,
-	});
-	crime_markers[crime.id] = marker;
+	if (!(crime.id in crime_markers)) {
+		// Create a marker for the sign	
+		var marker = new google.maps.Marker({
+			position: new google.maps.LatLng(crime.latitude , crime.longitude),
+			map: map,
+			icon: img_crime,
+			zIndex: 10,
+		});
+		crime_markers[crime.id] = marker;
 
-	// Add click event to marker
-	google.maps.event.addListener(marker, "click", function() {
-			activateCrimeMarker(crime.id);
-			infowindow.setContent(crime.description);
-			infowindow.open(map, marker);	
-	});	
+		// Add click event to marker
+		google.maps.event.addListener(marker, "click", function() {
+				activateCrimeMarker(crime.id);
+				infowindow.setContent(crime.description);
+				infowindow.open(map, marker);	
+		});	
+	}
 }
 
 
@@ -204,9 +208,7 @@ function querySign(id) {
 		success: function(sign) {
 			active_marker.nearby_crimes = [];
 			$.each(sign.crimes, function(i, crime) {
-				if (!(crime.id in crime_markers)) {
-					addCrime(crime);
-				}
+				addCrime(crime);
 				active_marker.nearby_crimes.push(crime.id);
 				activateCrimeScoreMarker(crime.id);
 			});
@@ -330,7 +332,7 @@ $(document).ready(function() {
 	
 	// Add search here button
 	$("#search").click(function() {
-        deactivateMarker();
+		deactivateMarker();
 		queryMap();
 	});
 	

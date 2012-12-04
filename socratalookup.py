@@ -9,7 +9,7 @@ meters_per_degree = 111185.10693302986
 class SocrataLookup:
 
     crimes_queries = {}
-    signs_queries = []
+    signs_queries = {}
     
     crimes = {}
     signs = {}
@@ -19,10 +19,36 @@ class SocrataLookup:
         lat = float(lat)
         lon = float(lon)
         meters = float(meters)
+        
+        # check if we can use cache
+        for (lat_q, lon_q, meters_q) in cls.signs_queries:
+            delta_lat = (lat_q - lat) * meters_per_degree
+            delta_lon = (lon_q - lon) * meters_per_degree
+            distance_btwn_centers = math.sqrt(delta_lat*delta_lat + delta_lon*delta_lon)     
+
+            # we have performed this query before
+            if (distance_btwn_centers + meters) <= meters_q:
+                degrees = meters / meters_per_degree
+                lat_min = lat - degrees
+                lat_max = lat + degrees
+                lon_min = lon - degrees
+                lon_max = lon + degrees
+                signs = []
+                for sign_id in cls.signs_queries[(lat_q, lon_q, meters_q)]:
+                    sign = cls.signs[sign_id]
+                    sign_lat = float(sign['latitude'])
+                    sign_lon = float(sign['longitude'])
+                    # crime from old query also matches this query
+                    if sign_lat >= lat_min and sign_lat <= lat_max and sign_lon >= lon_min and sign_lon <= lon_max:
+                        signs.append(sign)
+                return signs
+        
+        # Increase meters to pre-load cache
+        meters_new = meters + 100
     
         cl = SoClient("data.seattle.gov", "it8u-sznv")
         
-        degrees = meters / meters_per_degree
+        degrees = meters_new / meters_per_degree
 
         lat_min = lat - degrees
         lat_max = lat + degrees
@@ -55,14 +81,16 @@ class SocrataLookup:
         # Save to cache
         for d in data:
             cls.signs[d['objectid']] = d
+        cls.signs_queries[(lat, lon, meters_new)] = [ d['objectid'] for d in data ]
+
+        # return the cached data
+        return cls.get_signs(lat, lon, meters)
         
-        return data
         
     @classmethod
     def get_sign(cls, id):
         # use cache
         if id in cls.signs:
-            print "USING SIGN CACHE"
             return cls.signs[id]
             
         # query and save to cache
@@ -89,7 +117,6 @@ class SocrataLookup:
             distance_btwn_centers = math.sqrt(delta_lat*delta_lat + delta_lon*delta_lon)            
             # we have performed this query before
             if (distance_btwn_centers + meters) <= meters_q:
-                print "USING CRIME GEO CACHE"
                 degrees = meters / meters_per_degree
                 lat_min = lat - degrees
                 lat_max = lat + degrees
@@ -104,6 +131,9 @@ class SocrataLookup:
                     if crime_lat >= lat_min and crime_lat <= lat_max and crime_lon >= lon_min and crime_lon <= lon_max:
                         crimes.append(crime)
                 return crimes
+        
+        # Increase meters to pre-load cache
+        meters_new = meters + 100
     
         cl = SoClient("data.seattle.gov", "7ais-f98f")
 
@@ -154,7 +184,7 @@ class SocrataLookup:
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("VEH-THEFT-TRAILER")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("WEAPON-CONCEALED"))
                 ),
-                cl.CIRCLE("location", lat, lon, meters),
+                cl.CIRCLE("location", lat, lon, meters_new),
                 cl.GREATER_THAN(cl.COL("occurred_date_or_date_range_start"), cl.VAL("1900-01-01T00:00:00"))
             )
         )
@@ -162,9 +192,10 @@ class SocrataLookup:
         # Save to cache
         for d in data:
             cls.crimes[d['rms_cdw_id']] = d
-        cls.crimes_queries[(lat, lon, meters)] = [ d['rms_cdw_id'] for d in data ]
+        cls.crimes_queries[(lat, lon, meters_new)] = [ d['rms_cdw_id'] for d in data ]
         
-        return data
+        # return the cached data
+        return cls.get_crimes(lat, lon, meters)
                 
     @classmethod
     def get_crime(cls, id):
