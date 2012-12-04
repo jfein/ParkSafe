@@ -53,7 +53,7 @@ class CrimesHandler(BaseHandler):
 class CrimeHandler(BaseHandler):
     def get(self, id, format):        
         crime = SocrataLookup.get_crime(id)
-        crime = model.Crime(crime, self.base_uri)
+        crime = models.Crime(crime, self.base_uri)
 
         # Redirect
         if format is None:
@@ -135,7 +135,7 @@ class SignHandler(BaseHandler):
         sign['crimes'] = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
         sign = models.Sign(sign, self.base_uri)
     
-        sign['crime_score'] = sign.crimeScore()
+        sign.crimeScore()
         sign.crimeCount()
         # Redirect
         if format is None:
@@ -168,6 +168,13 @@ class SignHandler(BaseHandler):
             graph.add((signURIRef, PARKSAFESIGN['loc_info'], Literal(sign['loc_info'])))
             graph.add((signURIRef, PARKSAFESIGN['start_time'], Literal(sign['start_time'])))
             graph.add((signURIRef, PARKSAFESIGN['end_time'], Literal(sign['end_time'])))
+            graph.add((signURIRef, PARKSAFESIGN['crime_score'], Literal(sign['crime_score'])))
+            graph.add((signURIRef, PARKSAFESIGN['crimes_in_month'], Literal(sign['crime_time_stats']['one_month'])))
+            graph.add((signURIRef, PARKSAFESIGN['crimes_in_six_months'], Literal(sign['crime_time_stats']['six_months'])))
+            graph.add((signURIRef, PARKSAFESIGN['crimes_in_year'], Literal(sign['crime_time_stats']['one_year'])))
+            graph.add((signURIRef, PARKSAFESIGN['crimes_greater_one_year'], Literal(sign['crime_time_stats']['greater_one_year'])))
+
+
             for crime in sign['crimes']:
                 graph.add((signURIRef, PARKSAFESIGN['near'], URIRef(crime['uri'])))
             

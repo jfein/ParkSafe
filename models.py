@@ -57,7 +57,7 @@ class Sign(dict):
             crimeDist = math.sqrt((float(self.get('latitude'))-float(crime['latitude']))**2+(float(self.get('longitude'))-float(crime['longitude']))**2)*meters_per_degree
             crimeScore = crimeScore + math.exp(-1*crimeTime)*math.exp(-0.3*crimeDist)
         crimeScoreLog= log(crimeScore)
-        return -1*crimeScoreLog
+        self['crime_score'] = -1*crimeScoreLog
 
     def crimeCount(self):
         seconds_per_month = 2592000
