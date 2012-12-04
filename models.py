@@ -43,8 +43,12 @@ class Sign(dict):
             crimeTime = (time.time() - time.mktime(time.strptime(crime['date'], "%Y-%m-%dT%H:%M:%S")))/360000
             crimeTime = 1 if crimeTime <= 0 else crimeTime
             crimeDist = math.sqrt((float(self.get('latitude'))-float(crime['latitude']))**2+(float(self.get('longitude'))-float(crime['longitude']))**2)*meters_per_degree
-            crimeScore = crimeScore + (1/crimeTime)*(1/crimeDist)
-        return crimeScore
+            crimeScore = crimeScore + math.exp(-1*crimeTime)*math.exp(-1*crimeDist)
+            #if (crimeScore <= 0):
+        #print crimeScore
+        crimeScoreLog= math.log10(crimeScore)
+        #print "  " + str(crimeScoreLog)
+        return crimeScoreLog + 100
             
         
 class Crime(dict):
