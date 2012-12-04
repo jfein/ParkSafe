@@ -1,6 +1,7 @@
 from socratalookup import SocrataLookup
 import tornado.web
 import json, datetime
+import models
 
 from rdflib import ConjunctiveGraph, URIRef, Literal, Namespace, RDF
 
@@ -32,16 +33,7 @@ class CrimesHandler(BaseHandler):
         meters = self.get_argument("meters", 10)
         
         crimes = SocrataLookup.get_crimes(lat, lon, meters)
-        crimes = [ 
-            dict(
-                rms_cdw_id=crime['rms_cdw_id'], 
-                latitude=crime['latitude'], 
-                longitude=crime['longitude'], 
-                summarized_offense_description=crime['summarized_offense_description'],  
-                uri=self.base_uri+"/crimes/"+crime['rms_cdw_id']+".json"
-            )
-            for crime in crimes 
-        ]
+        crimes = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
         
         if format is None:
             accept = self.request.headers.get('Accept').lower()
@@ -61,16 +53,9 @@ class CrimesHandler(BaseHandler):
 class CrimeHandler(BaseHandler):
     def get(self, id, format):        
         crime = SocrataLookup.get_crime(id)
-        
-        filteredCrime = {}
-        filteredCrime['rms_cdw_id'] = crime['rms_cdw_id']
-        filteredCrime['latitude'] = crime['latitude']
-        filteredCrime['longitude'] = crime['longitude']
-        filteredCrime['summarized_offense_description'] = crime['summarized_offense_description']
-        filteredCrime['occurred_date_or_date_range_start'] = crime['occurred_date_or_date_range_start']
-        filteredCrime['hundred_block_location'] = crime['hundred_block_location']
-        filteredCrime['offense_type'] = crime['offense_type']
-        
+        crime = model.Crime(crime, self.base_uri)
+
+        # Redirect
         if format is None:
             accept = self.request.headers.get('Accept').lower()
             if "application/rdf+xml" in accept:
@@ -79,9 +64,11 @@ class CrimeHandler(BaseHandler):
             else:
                 self.set_status(303)
                 self.set_header("Location", self.base_uri + "/crimes/" + id + ".json") 
+        # JSON
         elif format == ".json":
             self.set_header("Content-Type", "application/json")
-            self.write(json.dumps(filteredCrime))
+            self.write(json.dumps(crime))
+        # RDF
         elif format == ".rdf" or format == ".nt" or format == ".ttl":
             graph = ConjunctiveGraph()
             graph.bind('geo', GEO)
@@ -89,15 +76,15 @@ class CrimeHandler(BaseHandler):
             graph.bind('dbpediaowl', DBPEDIAOWL)
             graph.bind('parksafecrime', PARKSAFECRIME)
             
-            crimeURI = self.base_uri + "/crimes/" + id
+            crimeURIRef = URIRef(crime['uri'])
             
-            graph.add((URIRef(crimeURI), RDF.type, DBPEDIAOWL['event']))
-            graph.add((URIRef(crimeURI), GEO['lat'], Literal(filteredCrime['latitude'])))
-            graph.add((URIRef(crimeURI), GEO['lon'], Literal(filteredCrime['longitude'])))
-            graph.add((URIRef(crimeURI), PARKSAFECRIME['offenseDescription'], Literal(filteredCrime['summarized_offense_description'])))
-            graph.add((URIRef(crimeURI), PARKSAFECRIME['occuredDate'], Literal(filteredCrime['occurred_date_or_date_range_start'])))
-            graph.add((URIRef(crimeURI), PARKSAFECRIME['blockInformation'], Literal(filteredCrime['hundred_block_location'])))
-            graph.add((URIRef(crimeURI), PARKSAFECRIME['offenseType'], Literal(filteredCrime['offense_type'])))
+            graph.add((crimeURIRef, RDF.type, DBPEDIAOWL['event']))
+            graph.add((crimeURIRef, GEO['lat'], Literal(crime['latitude'])))
+            graph.add((crimeURIRef, GEO['lon'], Literal(crime['longitude'])))
+            graph.add((crimeURIRef, PARKSAFECRIME['description'], Literal(crime['description'])))
+            graph.add((crimeURIRef, PARKSAFECRIME['date'], Literal(crime['date'])))
+            graph.add((crimeURIRef, PARKSAFECRIME['block'], Literal(crime['block'])))
+            graph.add((crimeURIRef, PARKSAFECRIME['type'], Literal(crime['type'])))
             
             if format == ".rdf":
                 self.set_header("Content-Type", "application/rdf+xml")
@@ -118,21 +105,11 @@ class SignsHandler(BaseHandler):
         lon = self.get_argument("lon", 0)
         meters = self.get_argument("meters", 10)
         filter_time = self.get_argument("filter_time", None)
-        
         if filter_time:
             filter_time = datetime.datetime.now().strftime('%H%M')
         
         signs = SocrataLookup.get_signs(lat, lon, meters, filter_time)
-        signs = [ 
-            dict(
-                objectid=sign['objectid'], 
-                latitude=sign['latitude'], 
-                longitude=sign['longitude'], 
-                categoryde=sign['categoryde'],  
-                uri=self.base_uri+"/signs/"+sign['objectid']+".json"
-            )
-            for sign in signs 
-        ]
+        signs = [ models.SignMeta(sign, self.base_uri) for sign in signs ]
     
         if format is None:
             accept = self.request.headers.get('Accept').lower()
@@ -154,29 +131,11 @@ class SignHandler(BaseHandler):
         meters = self.get_argument("meters", 100)
     
         sign = SocrataLookup.get_sign(id)
-        
-        filteredSign = {}
-        filteredSign['objectid'] = sign['objectid'] 
-        filteredSign['latitude'] = sign['latitude']
-        filteredSign['longitude'] = sign['longitude']
-        filteredSign['categoryde'] = sign['categoryde']
-        filteredSign['customtext'] = sign['customtext']
-        filteredSign['unitdesc'] = sign['unitdesc']
-        filteredSign['starttime'] = sign['starttime']
-        filteredSign['endtime'] = sign['endtime']
-        
         crimes = SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters)
-        filteredSign['crimes'] = [ 
-            dict(
-                rms_cdw_id=crime['rms_cdw_id'], 
-                latitude=crime['latitude'], 
-                longitude=crime['longitude'], 
-                summarized_offense_description=crime['summarized_offense_description'],  
-                uri=self.base_uri+"/crimes/"+crime['rms_cdw_id']+".json"
-            )
-            for crime in crimes 
-        ]
+        sign['crimes'] = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
+        sign = models.Sign(sign, self.base_uri)
     
+        # Redirect
         if format is None:
             accept = self.request.headers.get('Accept').lower()
             if "application/rdf+xml" in accept:
@@ -185,9 +144,11 @@ class SignHandler(BaseHandler):
             else:
                 self.set_status(303)
                 self.set_header("Location", self.base_uri + "/signs/" + id + ".json")
+        # JSON
         elif format == ".json":
             self.set_header("Content-Type", "application/json")
-            self.write(json.dumps(filteredSign))
+            self.write(json.dumps(sign))
+        # RDF
         elif format == ".rdf" or format == ".nt" or format == ".ttl":
             graph = ConjunctiveGraph()
             graph.bind('geo', GEO)
@@ -195,18 +156,18 @@ class SignHandler(BaseHandler):
             graph.bind('yago', YAGO)
             graph.bind('parksafesign', PARKSAFESIGN)
             
-            signURI = self.base_uri + "/signs/" + id
+            signURIRef = URIRef(sign['uri'])
             
-            graph.add((URIRef(signURI), RDF.type, YAGO['TrafficSigns']))
-            graph.add((URIRef(signURI), GEO['lat'], Literal(filteredSign['latitude'])))
-            graph.add((URIRef(signURI), GEO['lon'], Literal(filteredSign['longitude'])))
-            graph.add((URIRef(signURI), PARKSAFESIGN['categoryDescription'], Literal(filteredSign['categoryde'])))
-            graph.add((URIRef(signURI), PARKSAFESIGN['signText'], Literal(filteredSign['customtext'])))
-            graph.add((URIRef(signURI), PARKSAFESIGN['blockInformation'], Literal(filteredSign['unitdesc'])))
-            graph.add((URIRef(signURI), PARKSAFESIGN['starttime'], Literal(filteredSign['starttime'])))
-            graph.add((URIRef(signURI), PARKSAFESIGN['endtime'], Literal(filteredSign['endtime'])))
-            for crime in filteredSign['crimes']:
-                graph.add((URIRef(signURI), PARKSAFESIGN['near'], URIRef(self.base_uri + "/crimes/" + crime['rms_cdw_id'])))
+            graph.add((signURIRef, RDF.type, YAGO['TrafficSigns']))
+            graph.add((signURIRef, GEO['lat'], Literal(sign['latitude'])))
+            graph.add((signURIRef, GEO['lon'], Literal(sign['longitude'])))
+            graph.add((signURIRef, PARKSAFESIGN['description'], Literal(sign['description'])))
+            graph.add((signURIRef, PARKSAFESIGN['text'], Literal(sign['text'])))
+            graph.add((signURIRef, PARKSAFESIGN['loc_info'], Literal(sign['loc_info'])))
+            graph.add((signURIRef, PARKSAFESIGN['start_time'], Literal(sign['start_time'])))
+            graph.add((signURIRef, PARKSAFESIGN['end_time'], Literal(sign['end_time'])))
+            for crime in sign['crimes']:
+                graph.add((signURIRef, PARKSAFESIGN['near'], URIRef(crime['uri'])))
             
             if format == ".rdf":
                 self.set_header("Content-Type", "application/rdf+xml")
@@ -217,6 +178,7 @@ class SignHandler(BaseHandler):
             else:
                 self.set_header("Content-Type", "text/turtle")
                 self.write(graph.serialize(format='turtle')) 
+        # Unsupported format
         else:
             self.write_error(401, message="Format %s not supported" % format)
             

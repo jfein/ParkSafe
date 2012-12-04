@@ -17,18 +17,12 @@ body {
 
 #button_canvas {
 	width: 100%;
-	height: 5%;
+	height: 10%;
 	margin: 0;
 	padding: 0;
 	border-top: 2px solid black;
-	border-bottom: 2px solid black;
 	vertical-align:middle;
-}
-
-#sign_canvas {
-	width:100%;
-	height:0%;
-	overflow:auto;
+	background:#C2FEC0;
 }
 
 .sign {

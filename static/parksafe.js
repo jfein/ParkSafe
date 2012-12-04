@@ -5,23 +5,29 @@
  */ 
 
  
-function loadMap(lat, lon) {
+function init() {
 	// Create map
 	var mapOptions = {
-		center: new google.maps.LatLng(lat , lon),
+		center: cur_pos,
 		minZoom: 15,
 		zoom: 18,
 		maxZoom: 25,
 		mapTypeId: google.maps.MapTypeId.ROADMAP,
 	};
 	map = new google.maps.Map($("#map_canvas")[0], mapOptions);
+	
+	// set up geocoder
 	geocoder = new google.maps.Geocoder();
 	
-	// Query page on first map load
-	google.maps.event.addListenerOnce(map, 'idle', function(){
-		queryMap();
+	// Set up info window
+	infowindow = new google.maps.InfoWindow(
+		{ pixelOffset: new google.maps.Size(-100,10) }
+	);
+	google.maps.event.addListener(infowindow, 'closeclick', function() {
+			deactivateMarkers();
 	});
 }
+
 
 function deactivateMarkers() {
 	// Deactivate signs
@@ -48,11 +54,11 @@ function activateSignMarker(id) {
 		// Activate this sign marker
 		sign_markers[id].setIcon(img_sign_active);
 		sign_markers[id].setZIndex(11);
-		$('#'+id).addClass('sign_active');
 		
 		active_sign = id;
 	}
 }
+
 
 function activateCrimeMarker(id) {
 	if (active_sign != id) {
@@ -80,8 +86,8 @@ function addSigns(signs) {
     $(signs).each(function(i, sign) {
         var key = sign.latitude + "," + sign.longitude;
         if (key in compiledSigns) {
-			if (compiledSigns[key].categoryde.indexOf(sign.categoryde) == -1)
-				compiledSigns[key].categoryde += ("<BR>" + sign.categoryde);
+			if (compiledSigns[key].description.indexOf(sign.description) == -1)
+				compiledSigns[key].description += ("<BR>" + sign.description);
         }
         else {
             compiledSigns[key] = sign;
@@ -101,16 +107,12 @@ function addSigns(signs) {
 		var id = sign_markers.length - 1;
 
 		// Add click event to marker
-		google.maps.event.addListener(
-			marker, 
-			"click", 
-			function() {
+		google.maps.event.addListener(marker, "click", function() {
 				activateSignMarker(id);
-				querySign(sign.objectid);
-				infowindow.setContent(sign.categoryde + "<br>" + sign.latitude + " " + sign.longitude);
+				querySign(sign.id);
+				infowindow.setContent(sign.description + "<br>" + sign.latitude + " " + sign.longitude);
 				infowindow.open(map, marker);				
-			}
-		);
+		});
 	});
 }
 
@@ -133,41 +135,26 @@ function addCrimes(crimes) {
 		crime_markers.push(marker);
 
 		// Add click event to marker
-		google.maps.event.addListener(
-			marker, 
-			"click", 
-			function() {
+		google.maps.event.addListener(marker, "click", function() {
 				activateCrimeMarker(i);
-				infowindow.setContent(crime.summarized_offense_description);
+				infowindow.setContent(crime.description);
 				infowindow.open(map, marker);	
-			}
-		);	
+		});	
 	});
 }
 
 
 function codeAddress() {
-    var address = document.getElementById("address").value + " AND Seattle, Washington";
-    geocoder.geocode( { 'address': address}, function(results, status) {
-        if (status == google.maps.GeocoderStatus.OK) {
-            map.setCenter(results[0].geometry.location);
-        } else {
-            alert("Geocode was not successful for the following reason: " + status);
-        }
+    var address = $("#address").val() + " AND Seattle, Washington";
+    geocoder.geocode(
+		{ 'address': address}, 
+		function(results, status) {
+			if (status == google.maps.GeocoderStatus.OK) {
+				map.setCenter(results[0].geometry.location);
+			} else {
+				alert("Geocode was not successful for the following reason: " + status);
+			}
     });
-}
-
-
-function querySign(id) {
-	$.ajax({
-		url: 'signs/' + id + '.json',
-		type: "GET",
-		contentType: "application/json; charset=utf-8",
-		dataType: "json",
-		success: function(sign) {
-			addCrimes(sign.crimes)
-		}
-	});
 }
 
 
@@ -190,6 +177,20 @@ function querySigns(lat, lon, meters) {
 }
 
 
+function querySign(id) {
+	$.ajax({
+		url: 'signs/' + id + '.json',
+		type: "GET",
+		contentType: "application/json; charset=utf-8",
+		dataType: "json",
+		data: { meters: 50 },
+		success: function(sign) {
+			var x = 0;
+		}
+	});
+}
+
+
 function queryCrimes(lat, lon, meters) {
 	$.ajax({
 		url: 'crimes.json',
@@ -205,20 +206,23 @@ function queryCrimes(lat, lon, meters) {
 
 
 function queryMap() {
-	meters_per_degree = 111185.10693302986
-
 	center = map.getCenter();
 	lat = center.lat();
 	lon = center.lng();
+	meters = 300;
 	
-	corner = map.getBounds().getNorthEast();
-	ne_lat = corner.lat();
-	ne_lon = corner.lng();
+	if (map.getBounds()) {
+		meters_per_degree = 111185.10693302986
 	
-	x = (ne_lat - lat) * meters_per_degree;
-	y = (ne_lon - lon) * meters_per_degree;
+		corner = map.getBounds().getNorthEast();
+		ne_lat = corner.lat();
+		ne_lon = corner.lng();
 	
-	meters = Math.min(300, Math.sqrt(x*x + y*y));
+		x = (ne_lat - lat) * meters_per_degree;
+		y = (ne_lon - lon) * meters_per_degree;
+		
+		meters = Math.min(meters, Math.sqrt(x*x + y*y));
+	}
 	
 	querySigns(lat, lon, meters)
 	queryCrimes(lat, lon, meters)	
@@ -265,32 +269,23 @@ var img_crime_active = new google.maps.MarkerImage(
  
 
 var map;
+var infowindow;
 var geocoder;
+
+var cur_pos;
+
 var sign_markers = [];
 var crime_markers = [];
 
-var infoOptions = {
-	pixelOffset: new google.maps.Size(-100,10),
-};
-var infowindow = new google.maps.InfoWindow(infoOptions);
-google.maps.event.addListener(infowindow,'closeclick', function(){
-   deactivateMarkers();
-});
 var active_sign = -1;
 
-	
+
 $(document).ready(function() {
 	// TODO: get these dynamically
-	var lat = 47.619804;
-	var lon = -122.356735;
+	cur_pos = new google.maps.LatLng(47.619804 , -122.356735)
 
 	// Load map to page
-	loadMap(lat, lon);
-	
-	// Add center button
-	$("#center").click(function() {
-		map.setCenter(new google.maps.LatLng(lat , lon));
-	});
+	init();
 	
 	// Add close button
 	$("#close").click(function() {
@@ -302,4 +297,11 @@ $(document).ready(function() {
 	$("#search").click(function() {
 		queryMap();
 	});
+	
+	// Add search button
+	$("#do_search").click(function() {
+		codeAddress();
+	});
+	
+	queryMap();
 });

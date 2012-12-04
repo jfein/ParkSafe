@@ -50,12 +50,11 @@ class SoClient:
             rawResponse = response.read()
             return json.loads(rawResponse)
         except:
-            print "FUCKED UP"
+            print "RESTART SERVER"
             self.remove_conn()
-            time.sleep(50)
+            time.sleep(1)
             self._call_api(method, uri, data, headers)
             
-
     def _get_columns(self):
         return self._call_api(
             method="GET",
