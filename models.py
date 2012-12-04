@@ -1,3 +1,4 @@
+import time, math
 
 class CrimeMeta(dict):
     def __init__(self, soc_crime, base_uri):
@@ -5,7 +6,8 @@ class CrimeMeta(dict):
                 id=soc_crime['rms_cdw_id'], 
                 latitude=soc_crime['latitude'], 
                 longitude=soc_crime['longitude'], 
-                description=soc_crime['summarized_offense_description'],
+                description=soc_crime['summarized_offense_description'],  
+                date=soc_crime['occurred_date_or_date_range_start'], 
                 uri=base_uri+"/crimes/"+soc_crime['rms_cdw_id']+".json"
         )
         
@@ -33,6 +35,17 @@ class Sign(dict):
                 crimes=soc_sign['crimes'],
                 uri=base_uri+"/signs/"+soc_sign['objectid']+".json"
         )
+        
+    def crimeScore(self):
+        crimeScore = 0;
+        meters_per_degree = 111185.10693302986
+        for crime in self.get('crimes'):
+            crimeTime = (time.time() - time.mktime(time.strptime(crime['date'], "%Y-%m-%dT%H:%M:%S")))/360000
+            crimeTime = 1 if crimeTime <= 0 else crimeTime
+            crimeDist = math.sqrt((float(self.get('latitude'))-float(crime['latitude']))**2+(float(self.get('longitude'))-float(crime['longitude']))**2)*meters_per_degree
+            crimeScore = crimeScore + (1/crimeTime)*(1/crimeDist)
+        return crimeScore
+            
         
 class Crime(dict):
     def __init__(self, soc_crime, base_uri):

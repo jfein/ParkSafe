@@ -135,6 +135,7 @@ class SignHandler(BaseHandler):
         sign['crimes'] = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
         sign = models.Sign(sign, self.base_uri)
     
+        sign['crime_score'] = sign.crimeScore();
         # Redirect
         if format is None:
             accept = self.request.headers.get('Accept').lower()

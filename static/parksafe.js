@@ -98,9 +98,7 @@ function addSign(sign) {
 	// Add click event to marker
 	google.maps.event.addListener(marker, "click", function() {
 			activateSignMarker(sign.id);
-			querySign(sign.id);
-			infowindow.setContent(sign.description + "<br>" + sign.latitude + " " + sign.longitude);
-			infowindow.open(map, marker);				
+			querySign(sign.id);			
 	});
 }
 
@@ -212,6 +210,8 @@ function querySign(id) {
 				active_marker.nearby_crimes.push(crime.id);
 				activateCrimeScoreMarker(crime.id);
 			});
+            infowindow.setContent(sign.description + "<br>" + sign.latitude + " " + sign.longitude + "<br>Crime Score: " + sign.crime_score);
+			infowindow.open(map, sign_markers[sign.id]);	
 		}
 	});
 }
@@ -330,6 +330,7 @@ $(document).ready(function() {
 	
 	// Add search here button
 	$("#search").click(function() {
+        deactivateMarker();
 		queryMap();
 	});
 	
