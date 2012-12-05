@@ -179,12 +179,17 @@ class SignHandler(BaseHandler):
             self.finish()
         # call socrata
         else:
-            f = lambda sign : self.handle_socrata_data(format, sign) if 'crimes' in sign else SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters, lambda crimes: self.handle_socrata_data(format, sign, crimes))
-            SocrataLookup.get_sign(id, f)
+            def callback(sign):
+                if 'crimes' in sign:
+                    self.handle_socrata_data(format, sign)
+                else:
+                    f = lambda crimes: self.handle_socrata_data(format, sign, crimes)
+                    SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters, f)
+            SocrataLookup.get_sign(id, callback)
             
     def handle_socrata_data(self, format, sign, crimes=None):
         if not sign:
-            self.write_error(404, message="error getting sign")
+            self.write_error(404, message="sign not found")
             self.finish()
             return
         
@@ -219,8 +224,7 @@ class SignHandler(BaseHandler):
             graph.add((signURIRef, PARKSAFESIGN['crimes_in_six_months'], Literal(sign['crime_time_stats']['six_months'])))
             graph.add((signURIRef, PARKSAFESIGN['crimes_in_year'], Literal(sign['crime_time_stats']['one_year'])))
             graph.add((signURIRef, PARKSAFESIGN['crimes_greater_one_year'], Literal(sign['crime_time_stats']['greater_one_year'])))
-
-
+            
             for crime in sign['crimes']:
                 graph.add((signURIRef, PARKSAFESIGN['near'], URIRef(crime['uri'])))
             
@@ -233,8 +237,8 @@ class SignHandler(BaseHandler):
             else:
                 self.set_header("Content-Type", "text/turtle")
                 self.write(graph.serialize(format='turtle')) 
+                
         self.finish()
-
             
 
 class QueryHandler(BaseHandler):
