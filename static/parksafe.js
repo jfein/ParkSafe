@@ -293,10 +293,26 @@ function activateSign(sign) {
 	// Make sign and crime markers active
 	crimes = aggregateCrimes(sign.crimes);
 	activateSignMarker(marker_id, crimes);
-	
+
+	// Do score info
+	var score = Number((sign.crime_score).toFixed(2));
+	var score_text = "";
+	// Unsafe
+	if (score < 35) {
+		score_text += "<font color='red'>" + score + "(Unsafe)</font>";
+	}
+	// Caution
+	else if (score  < 65) {
+		score_text += "<font color='orange'>" + score + "(Be Cautious)</font>";
+	}
+	// Unsafe
+	else {
+		score_text += "<font color='green'>" + score + "(Safe)</font>";
+	}
+		
 	// Set content of text canvas
 	var content = "<b>" + active_marker.text + "</b><br>" + 
-		"<u>Safety Rating: " + Number((sign.crime_score).toFixed(2)) + "</u><br>" +
+		"Safety Rating: " + score_text + "<br>" +
 		"<table>" +
 		"<tr><td># crimes within 1 month:</td><td>" + sign.crime_time_stats.one_month + "</td></tr>" +
 		"<tr><td># crimes between 1 and 6 months:</td><td>" + sign.crime_time_stats.six_months + "</td></tr>" +

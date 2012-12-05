@@ -128,7 +128,7 @@ class SignsHandler(BaseHandler):
         
 class SignHandler(BaseHandler):
     def get(self, id, format):        
-        meters = self.get_argument("meters", 100)
+        meters = self.get_argument("meters", 250)
     
         sign = SocrataLookup.get_sign(id)
         crimes = SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters)
