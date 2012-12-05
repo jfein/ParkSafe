@@ -43,10 +43,8 @@ class Sign(dict):
                 crimes=soc_sign['crimes'],
                 uri=base_uri+"/signs/"+soc_sign['objectid']+".json"
         )
-
-        
-
-        
+        self.crimeScore()
+        self.crimeCount()  
         
     def crimeScore(self):
         crimeScore = 0;

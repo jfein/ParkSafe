@@ -11,13 +11,35 @@ function init() {
 		center: cur_pos,
 		minZoom: 15,
 		zoom: 18,
-		maxZoom: 25,
 		mapTypeId: google.maps.MapTypeId.ROADMAP,
+		mapTypeControl: false,
 	};
 	map = new google.maps.Map($("#map_canvas")[0], mapOptions);
 	
 	// set up geocoder
 	geocoder = new google.maps.Geocoder();
+	
+	// Make green marker for our position
+	var pinColor = "C6EF8C";
+	var pinImage = new google.maps.MarkerImage(
+		"http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|" + pinColor,
+		new google.maps.Size(20, 34),
+		new google.maps.Point(0,0),
+		new google.maps.Point(10, 34)
+	);
+	var pinShadow = new google.maps.MarkerImage(
+		"http://chart.apis.google.com/chart?chst=d_map_pin_shadow",
+		new google.maps.Size(40, 37),
+		new google.maps.Point(0, 0),
+		new google.maps.Point(12, 35)
+	);
+	var marker = new google.maps.Marker({
+		position: cur_pos,
+		map: map,
+		icon: pinImage,
+		shadow: pinShadow,
+		zIndex: 0,
+	});
 }
 
 
@@ -119,7 +141,7 @@ function addSignMarker(sign_id, lat, lon, text) {
 
 		// Add click event to marker
 		google.maps.event.addListener(marker, "click", function() {
-				querySign(sign_id);				
+			querySign(sign_id);
 		});
 	}
 	return marker_id;
@@ -250,16 +272,18 @@ function activateCrime(crime) {
 		activateActiveCrimeScoreMarker(marker_id);
 
 	// Set content of the text canvas
-	var html = "<b>Crime Types:</b> ";
+	var mindate = $.datepicker.formatDate('m/d/yy', $.datepicker.parseDate("yy-mm-dd", crime.mindate));
+	var maxdate = $.datepicker.formatDate('m/d/yy', $.datepicker.parseDate("yy-mm-dd", crime.maxdate));
+
+	var html = "";
+	html += "<b>" + crime.totalCrimes + " total crimes from " + mindate + " till " + maxdate + ":</b><br>";
+	html += "<table>";
 	var keys = Object.keys(crime.crimeCounts);
 	$.each(keys, function(i, key) {
-		html += key + " (" + crime.crimeCounts[key] + ")";
-		if (i != keys.length-1)
-			html += ", ";
+		html += "<tr><td># of " + key + " crimes:</td><td>" + crime.crimeCounts[key] + "</td></tr>";
 	});
-	html += "<br><b>Total # of Crimes:</b> " + crime.totalCrimes;
-	html += "<br><b>From:</b> " + crime.mindate + " <b>To:</b> " + crime.maxdate
-	$("#text_canvas").html(html);
+	html += "</table>";
+	open_bottom_canvas(html);
 }
 
 
@@ -279,7 +303,7 @@ function activateSign(sign) {
 		"<tr><td># crimes between 6 months and 1 year:</td><td>" + sign.crime_time_stats.one_year + "</td></tr>" +
 		"<tr><td># crimes over 1 year ago:</td><td>" + sign.crime_time_stats.greater_one_year + "</td></tr>" +
 		"</table>";
-	$("#text_canvas").html(content);
+	open_bottom_canvas(content);
 }
 
 
@@ -317,6 +341,7 @@ function querySigns(lat, lon, meters) {
 			queries_in_flight -= 1;
 			if (queries_in_flight == 0) {
 				$('#overlay').stop();
+				$("#overlay").css({opacity:0.7});
 				$('#overlay').hide();
 			}
 			addSigns(signs);
@@ -339,6 +364,7 @@ function querySign(id) {
 			queries_in_flight -= 1;
 			if (queries_in_flight == 0) {
 				$('#overlay').stop();
+				$("#overlay").css({opacity:0.7});
 				$('#overlay').hide();
 			}
 			activateSign(sign);
@@ -361,6 +387,7 @@ function queryCrimes(lat, lon, meters) {
 			queries_in_flight -= 1;
 			if (queries_in_flight == 0) {
 				$('#overlay').stop();
+				$("#overlay").css({opacity:0.7});
 				$('#overlay').hide();
 			}
 			addCrimes(crimes);
@@ -389,6 +416,22 @@ function queryMap() {
 	}
 	querySigns(lat, lon, meters)
 	queryCrimes(lat, lon, meters)
+}
+
+
+function close_bottom_canvas() {
+	$("#close").hide();
+	deactivateMarker();
+	$("#text_canvas").html("")
+	$("#bottom_canvas").height(10);
+	$("#map_canvas").css({bottom: 11});
+}
+
+function open_bottom_canvas(html) {
+	$("#text_canvas").html(html);
+	$("#close").show();
+	$("#map_canvas").css({bottom: 121});
+	$("#bottom_canvas").height(120);
 }
 
 
@@ -472,20 +515,34 @@ $(document).ready(function() {
 	
 	// Add close button
 	$("#close").click(function() {
-		deactivateMarker();
-		$("#text_canvas").html("")
+		close_bottom_canvas();
 	});
 	
-	// Add search here button
-	$("#search").click(function() {
-		deactivateMarker();
+	// Add refresh button
+	$("#refresh").click(function() {
+		close_bottom_canvas();
 		queryMap();
 	});
 	
 	// Add search button
 	$("#do_search").click(function() {
+		close_bottom_canvas();
 		codeAddress();
 	});
 	
+	// Add text box hit "enter" to do search
+	$("#address").keyup(function(event){
+		if(event.keyCode == 13){
+			$("#do_search").click();
+		}
+	});
+	
+	// Add center button
+	$("#center").click(function() {
+		map.setCenter(cur_pos);
+		queryMap();
+	});
+	
+	close_bottom_canvas();
 	queryMap();
 });

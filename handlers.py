@@ -134,9 +134,7 @@ class SignHandler(BaseHandler):
         crimes = SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters)
         sign['crimes'] = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
         sign = models.Sign(sign, self.base_uri)
-    
-        sign.crimeScore()
-        sign.crimeCount()
+
         # Redirect
         if format is None:
             accept = self.request.headers.get('Accept').lower()

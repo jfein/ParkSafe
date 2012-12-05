@@ -5,23 +5,30 @@
 <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" type="text/css" href="/static/style.css">
 <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWEtfm6B9jVhnR3wOefB80ODwxPOGQUTQ&sensor=true"></script>
-<script src="http://code.jquery.com/jquery-latest.js"></script>
+<script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.5.1.min.js"></script>
+	<script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.ui/1.8.10/jquery-ui.min.js"></script>
 <script type="text/javascript" src="/static/parksafe.js"></script>
 </head>
 
 <body>
     <div id="overlay"></div>
+	
 	<div id="button_canvas">
+		<!---<input type="checkbox" id="filter_time" value="True">Filter signs -->
         <input id="address"><button id="do_search">Search</button>
-		<br>
-		<input type="checkbox" id="filter_time" value="True">Filter signs
-		<button id="close">Close</button>
-		<button id="search">Refresh</button>
+		&nbsp;&nbsp;
+		<img class="button centered" id="center" src="/static/images/center.png" alt="Center Map">
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		<img class="button centered" id="refresh" src="/static/images/refresh.png" alt="Refresh Markers">
 	</div>
 	
 	<div id="map_canvas"></div>
 	
-	<div id="text_canvas"></div>
+	<div id="bottom_canvas">
+		<img class="button" id="close" src="/static/images/close.png" alt="Close Markers">
+		<div id="text_canvas"></div>
+	</div>
+
 
 </body>
 
