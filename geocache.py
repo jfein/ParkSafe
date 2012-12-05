@@ -18,10 +18,10 @@ class GeoCache(dict):
         return self['data'].get(id, None)
         
     def get_query(self, lat, lon, r):
+        if (lat, lon, r) in self['queries']:
+            return [ self['data'][id] for id in self['queries'][(lat, lon, r)] ] 
+    
         for (lat_q, lon_q, meters_q), ids in self['queries'].iteritems():
-            # If exact query was already made, store results
-            if lat_q == lat and lon_q == lon and meters_q == r:
-                return [ self['data'][id] for id in ids ]
             delta_lat = (lat_q - lat) * GeoCache.meters_per_degree
             delta_lon = (lon_q - lon) * GeoCache.meters_per_degree
             distance_btwn_centers = math.sqrt(delta_lat*delta_lat + delta_lon*delta_lon)   

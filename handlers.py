@@ -23,18 +23,19 @@ class BaseHandler(tornado.web.RequestHandler):
         
     def write_error(self, status_code, message):
         self.set_status(status_code)
-        self.finish("Error {status_code} - {message}".format(**locals()))
+        self.write("Error {status_code} - {message}".format(**locals()))
         
         
 class CrimesHandler(BaseHandler):
+
+    @tornado.web.asynchronous
     def get(self, format):
+        # GET arguments
         lat = self.get_argument("lat", 0)
         lon = self.get_argument("lon", 0)
         meters = self.get_argument("meters", 10)
-        
-        crimes = SocrataLookup.get_crimes(lat, lon, meters)
-        crimes = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
-        
+    
+        # Content negotiation
         if format is None:
             accept = self.request.headers.get('Accept').lower()
             if "application/rdf+xml" in accept:
@@ -42,12 +43,28 @@ class CrimesHandler(BaseHandler):
                 self.set_header("Location", self.base_uri + "/crimes.rdf?lat=" + lat + "&lon=" + lon + "&meters=" + meters)
             else:
                 self.set_status(303)
-                self.set_header("Location", self.base_uri + "/crimes.json?lat=" + lat + "&lon=" + lon + "&meters=" + meters)   
-        elif format == ".json":
-            self.set_header("Content-Type", "application/json")
-            self.write(json.dumps(crimes))
-        else:
+                self.set_header("Location", self.base_uri + "/crimes.json?lat=" + lat + "&lon=" + lon + "&meters=" + meters)
+            self.finish()
+        # Format not supported
+        if format != ".json":
             self.write_error(401, message="Format %s not supported" % format)
+            self.finish()
+        # Get data and serve the JSON request
+        else:
+            SocrataLookup.get_crimes(lat, lon, meters, self.handle_socrata_data)
+            
+    # Callback for the socrata sign lookup
+    # serves the retreived data as a JSON response
+    def handle_socrata_data(self, crimes):
+        # Closed client connection
+        if self.request.connection.stream.closed():
+            self.finish()
+            return
+    
+        crimes = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
+
+        self.set_header("Content-Type", "application/json")
+        self.finish(json.dumps(crimes))                     
         
         
 class CrimeHandler(BaseHandler):
@@ -100,17 +117,15 @@ class CrimeHandler(BaseHandler):
         
         
 class SignsHandler(BaseHandler):
+
+    @tornado.web.asynchronous
     def get(self, format):
+        # GET arguments
         lat = self.get_argument("lat", 0)
         lon = self.get_argument("lon", 0)
         meters = self.get_argument("meters", 10)
-        filter_time = self.get_argument("filter_time", None)
-        if filter_time:
-            filter_time = datetime.datetime.now().strftime('%H%M')
-        
-        signs = SocrataLookup.get_signs(lat, lon, meters, filter_time)
-        signs = [ models.SignMeta(sign, self.base_uri) for sign in signs ]
-    
+
+        # Content negotiation
         if format is None:
             accept = self.request.headers.get('Accept').lower()
             if "application/rdf+xml" in accept:
@@ -119,23 +134,36 @@ class SignsHandler(BaseHandler):
             else:
                 self.set_status(303)
                 self.set_header("Location", self.base_uri + "/signs.json?lat=" + lat + "&lon=" + lon + "&meters=" + meters)
-        elif format == ".json":
-            self.set_header("Content-Type", "application/json")
-            self.write(json.dumps(signs))
-        else:
+            self.finish()
+        # Format not supported
+        if format != ".json":
             self.write_error(401, message="Format %s not supported" % format)
-
+            self.finish()
+        # Get data and serve the JSON request
+        else:
+            SocrataLookup.get_signs(lat, lon, meters, self.handle_socrata_data)
         
+    # Callback for the socrata sign lookup
+    # serves the retreived data as a JSON response
+    def handle_socrata_data(self, signs):
+        # Closed client connection
+        if self.request.connection.stream.closed():
+            self.finish()
+            return
+    
+        signs = [ models.SignMeta(sign, self.base_uri) for sign in signs ]
+
+        self.set_header("Content-Type", "application/json")
+        self.finish(json.dumps(signs))
+
+
 class SignHandler(BaseHandler):
+
+    @tornado.web.asynchronous
     def get(self, id, format):        
         meters = self.get_argument("meters", 250)
-    
-        sign = SocrataLookup.get_sign(id)
-        crimes = SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters)
-        sign['crimes'] = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]
-        sign = models.Sign(sign, self.base_uri)
 
-        # Redirect
+        # Content negotiation
         if format is None:
             accept = self.request.headers.get('Accept').lower()
             if "application/rdf+xml" in accept:
@@ -144,8 +172,28 @@ class SignHandler(BaseHandler):
             else:
                 self.set_status(303)
                 self.set_header("Location", self.base_uri + "/signs/" + id + ".json")
+            self.finish()
+        # invalid format
+        elif format != ".json" and format != ".rdf":
+            self.write_error(401, message="Format %s not supported" % format)
+            self.finish()
+        # call socrata
+        else:
+            f = lambda sign : self.handle_socrata_data(format, sign) if 'crimes' in sign else SocrataLookup.get_crimes(sign['latitude'], sign['longitude'], meters, lambda crimes: self.handle_socrata_data(format, sign, crimes))
+            SocrataLookup.get_sign(id, f)
+            
+    def handle_socrata_data(self, format, sign, crimes=None):
+        if not sign:
+            self.write_error(404, message="error getting sign")
+            self.finish()
+            return
+        
+        if crimes:
+            sign['crimes'] = [ models.CrimeMeta(crime, self.base_uri) for crime in crimes ]    
+        sign = models.Sign(sign, self.base_uri)
+    
         # JSON
-        elif format == ".json":
+        if format == ".json":
             self.set_header("Content-Type", "application/json")
             self.write(json.dumps(sign))
         # RDF
@@ -185,9 +233,8 @@ class SignHandler(BaseHandler):
             else:
                 self.set_header("Content-Type", "text/turtle")
                 self.write(graph.serialize(format='turtle')) 
-        # Unsupported format
-        else:
-            self.write_error(401, message="Format %s not supported" % format)
+        self.finish()
+
             
 
 class QueryHandler(BaseHandler):

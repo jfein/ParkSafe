@@ -11,41 +11,48 @@ prefetch_buffer = 1.25
 
 class SocrataLookup:
 
+
     crime_cache = GeoCache()
     sign_cache = GeoCache()
 
+    
     @classmethod
-    def get_signs(cls, lat, lon, meters, filter_time=None):
+    def get_signs(cls, lat, lon, meters, callback):
+        # format input
         lat = float(lat)
         lon = float(lon)
         meters = float(meters)
         
+        # Increase meters to pre-load cache
+        meters_new = meters * prefetch_buffer
+        
+        # the callback upon this function success
+        def query_callback(data):
+            # Save to cache
+            for d in data:
+                cls.sign_cache.cache_data(d['objectid'], d)
+            cls.sign_cache.cache_query(lat, lon, meters_new, [ d['objectid'] for d in data ])
+            # call the callback w/ the data
+            callback(data)
+        
         # use cache
         cached_res = cls.sign_cache.get_query(lat, lon, meters)
         if cached_res:
-            return cached_res
-        
-        # Increase meters to pre-load cache
-        meters_new = meters * prefetch_buffer
-    
-        cl = SoClient("data.seattle.gov", "it8u-sznv")
-        
+            query_callback(cached_res)
+            return
+            
+        # Make a box
         degrees = meters_new / meters_per_degree
         lat_min = lat - degrees
         lat_max = lat + degrees
         lon_min = lon - degrees
         lon_max = lon + degrees
         
-        # Filter signs by time
-        if filter_time:
-            term = cl.AND(
-                cl.GREATER_THAN_OR_EQUALS(cl.COL("starttime"), cl.VAL(filter_time)),
-                cl.LESS_THAN_OR_EQUALS(cl.COL("endtime"), cl.VAL(filter_time)), 
-            )
-        else:
-            term = cl.AND()
+        # Make a socrata client
+        cl = SoClient("data.seattle.gov", "it8u-sznv")
         
-        data = cl.query(
+        # perform the asynch request
+        cl.query_a(
             cl.AND(
                 cl.GREATER_THAN(cl.COL("latitude"), cl.VAL(lat_min)),
                 cl.LESS_THAN(cl.COL("latitude"), cl.VAL(lat_max)),
@@ -54,54 +61,67 @@ class SocrataLookup:
                 cl.OR(
                     cl.CONTAINS(cl.COL("customtext"), cl.VAL("PARK")), 
                     cl.CONTAINS(cl.COL("categoryde"), cl.VAL("PARK"))
-                ),
-                term
-            )
+                )
+            ),
+            query_callback
         )
-        
-        # Save to cache
-        for d in data:
-            cls.sign_cache.cache_data(d['objectid'], d)
-        cls.sign_cache.cache_query(lat, lon, meters_new, [ d['objectid'] for d in data ])
 
-        # return the cached data
-        return cls.get_signs(lat, lon, meters)
         
     @classmethod
-    def get_sign(cls, id):
+    def get_sign(cls, id, callback):
+        # the callback upon this api query success
+        def query_callback(data):
+            if type(data) != list:
+                callback(data)
+            elif len(data) != 1:
+                callback(None)
+            else:
+                if 'crimes' in data[0]:
+                    print "FUCK"
+                cls.sign_cache.cache_data(data[0]['objectid'], data[0])
+                callback(data[0])
+    
         # use cache
         cached_res = cls.sign_cache.get_data(id)
         if cached_res:
-            return cached_res
+            query_callback(cached_res)
+            return
             
         # query
         cl = SoClient("data.seattle.gov", "it8u-sznv")
-        data = cl.query(cl.EQUALS(cl.COL("objectid"), cl.VAL(id)))
-        if not data:
-            return None
-            
-        # save to cache
-        cls.sign_cache.cache_data(data[0]['objectid'], data[0])
-        
-        return data[0]
+        cl.query_a(cl.EQUALS(cl.COL("objectid"), cl.VAL(id)), query_callback)
 
+        
     @classmethod
-    def get_crimes(cls, lat, lon, meters):
+    def get_crimes(cls, lat, lon, meters, callback):
+        # format input
         lat = float(lat)
         lon = float(lon)
         meters = float(meters)
         
+        # Increase meters to pre-load cache
+        meters_new = meters * prefetch_buffer
+        
+        # the callback upon this function success
+        def query_callback(data):
+            # Save to cache
+            for d in data:
+                cls.crime_cache.cache_data(d['rms_cdw_id'], d)
+            cls.crime_cache.cache_query(lat, lon, meters_new, [ d['rms_cdw_id'] for d in data ])
+            # call the callback w/ the data
+            callback(data)
+        
         # use cache
         cached_res = cls.crime_cache.get_query(lat, lon, meters)
         if cached_res:
-            return cached_res
-        
-        # Increase meters to pre-load cache
-        meters_new = meters * prefetch_buffer
-    
+            query_callback(cached_res)
+            return
+
+        # Make a socrata client            
         cl = SoClient("data.seattle.gov", "7ais-f98f")
 
-        data = cl.query(
+        # perform the asynch request
+        cl.query_a(
             cl.AND(
                 cl.OR(
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("THEFT-CARPROWL")),
@@ -142,17 +162,11 @@ class SocrataLookup:
                 ),
                 cl.CIRCLE("location", lat, lon, meters_new),
                 cl.GREATER_THAN(cl.COL("occurred_date_or_date_range_start"), cl.VAL("1900-01-01T00:00:00"))
-            )
+            ),
+            query_callback
         )
-        
-        # Save to cache
-        for d in data:
-            cls.crime_cache.cache_data(d['rms_cdw_id'], d)
-        cls.crime_cache.cache_query(lat, lon, meters_new, [ d['rms_cdw_id'] for d in data ])
          
-        # return the cached data
-        return cls.get_crimes(lat, lon, meters)
-                
+         
     @classmethod
     def get_crime(cls, id):
         # use cache

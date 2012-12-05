@@ -1,6 +1,8 @@
 import httplib
 import json
 import time
+import tornado.httpclient
+
 
 class SoClient:
     '''
@@ -8,21 +10,16 @@ class SoClient:
     Not threadsafe.
     '''
     
+    
     conns = {}
     cols = {}
 
+    
     def __init__(self, host, view_id):
         self.host = host
         self.view_id = view_id
         self.cols = self._get_columns()
-        
-    def get_conn(self):
-        if self.host not in SoClient.conns:
-            SoClient.conns[self.host] = httplib.HTTPConnection(self.host)
-        return SoClient.conns[self.host]
-        
-    def remove_conn(self):
-        del(SoClient.conns[self.host])
+
         
     # Calls socrata API
     # Will crash if error
@@ -32,8 +29,18 @@ class SoClient:
             uri,
             data={},
             headers={}):
+            
+        def get_conn():
+            if self.host not in SoClient.conns:
+                print "MAKING HTTPLIB CONNECTION TO SOCRATA"
+                SoClient.conns[self.host] = httplib.HTTPConnection(self.host)
+            return SoClient.conns[self.host]
+            
+        def remove_conn():
+            del(SoClient.conns[self.host])
+            
         try:
-            conn = self.get_conn()
+            conn = get_conn()
             
             jsonData = json.dumps(data)
             print "\tCALLING SOCRATA"
@@ -51,9 +58,35 @@ class SoClient:
             return json.loads(rawResponse)
         except:
             print "RESTART SERVER"
-            self.remove_conn()
+            remove_conn()
             time.sleep(1)
             self._call_api(method, uri, data, headers)
+            
+            
+    # Calls socrata API asynchronously
+    def _call_api_async(
+            self,
+            callback,
+            method,
+            uri,
+            data={},
+            headers={}):
+                 
+        def handle_request(response):
+            if response.error:
+                print "There was an error detected."
+                print "Response status = %s.\n" % response.code
+                print "Response = %s.\n" % response.body
+                raise SystemExit(1)
+                
+            rawResponse = response.body
+            callback(json.loads(rawResponse))
+        
+        jsonData = json.dumps(data)
+        req = tornado.httpclient.HTTPRequest("http://" + self.host + uri, method=method, headers=headers, body=jsonData)
+        http_client = tornado.httpclient.AsyncHTTPClient()
+        http_client.fetch(req, handle_request)
+
             
     def _get_columns(self):
         if self.view_id in SoClient.cols:
@@ -68,14 +101,17 @@ class SoClient:
         
         return cols
         
+        
     def _get_col_id(self, name):
         for col in self.cols:
             if col["fieldName"] == name:
                 return col["id"]
-                
+           
+           
     def _get_col_keys(self):
         return [ col['fieldName'] for col in self.cols ]        
-              
+          
+          
     # Run query, returns parsed & formatted data
     def query(self, condition):
         res = self._call_api(
@@ -106,7 +142,45 @@ class SoClient:
                 obj[key] = row[i + start_key]
             data.append(obj)
         return data
-       
+        
+        
+    # Run query, returns parsed & formatted data
+    def query_a(self, condition, callback):
+        # callback on API response
+        def handle_api_response(res):
+            if not res:
+                return []
+                
+            rows = res["data"]
+            if not rows:
+                return []
+
+            data = []
+            keys = self._get_col_keys()
+            start_key = len(rows[0]) - len(keys)
+            for row in rows:
+                obj = {}
+                for i, key in enumerate(keys):
+                    obj[key] = row[i + start_key]
+                data.append(obj)
+            callback(data)
+    
+        # call asynch api
+        self._call_api_async(
+            callback=handle_api_response,
+            method="POST",
+            uri="/views/INLINE/rows.json?method=index",
+            headers={ "Content-type:" : "application/json" },
+            data={
+                "originalViewId" : self.view_id,
+                "name" : "SoClient Inline Filter",
+                "columns" : self.cols,
+                "query" : { "filterCondition" : condition }
+            }
+        )
+  
+
+  
     '''
     Methods to generate conditional terms for querying
     '''
