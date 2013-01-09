@@ -1,6 +1,7 @@
 import json
 import math
-from soclient import SoClient
+import tornado.gen
+from PySocrataClient.socrataclient import SocrataClient
 from geocache import GeoCache
 
 
@@ -14,10 +15,20 @@ class SocrataLookup:
 
     crime_cache = GeoCache()
     sign_cache = GeoCache()
+    
+    sign_client = SocrataClient("data.seattle.gov", "it8u-sznv")
+    crime_client = SocrataClient("data.seattle.gov", "7ais-f98f")
 
     
     @classmethod
-    def get_signs(cls, lat, lon, meters, callback):
+    @tornado.gen.engine
+    def get_signs(
+            cls, 
+            lat, 
+            lon, 
+            meters, 
+            callback=lambda x : x
+    ):
         # format input
         lat = float(lat)
         lon = float(lon)
@@ -25,35 +36,23 @@ class SocrataLookup:
         
         # Increase meters to pre-load cache
         meters_new = meters * prefetch_buffer
+
+        # load cache
+        data = cls.sign_cache.get_query(lat, lon, meters)
         
-        # the callback upon this function success
-        def query_callback(data):
-            # Save to cache
-            for d in data:
-                cls.sign_cache.cache_data(d['objectid'], d)
-            cls.sign_cache.cache_query(lat, lon, meters_new, [ d['objectid'] for d in data ])
-            # call the callback w/ the data
-            callback(data)
-        
-        # use cache
-        cached_res = cls.sign_cache.get_query(lat, lon, meters)
-        if cached_res:
-            query_callback(cached_res)
-            return
+        # cache is bad, make new request
+        if not data:
+            # Make a box
+            degrees = meters_new / meters_per_degree
+            lat_min = lat - degrees
+            lat_max = lat + degrees
+            lon_min = lon - degrees
+            lon_max = lon + degrees
             
-        # Make a box
-        degrees = meters_new / meters_per_degree
-        lat_min = lat - degrees
-        lat_max = lat + degrees
-        lon_min = lon - degrees
-        lon_max = lon + degrees
-        
-        # Make a socrata client
-        cl = SoClient("data.seattle.gov", "it8u-sznv")
-        
-        # perform the asynch request
-        cl.query_a(
-            cl.AND(
+            # Load socrata client
+            cl = cls.sign_client
+            
+            query = cl.AND(
                 cl.GREATER_THAN(cl.COL("latitude"), cl.VAL(lat_min)),
                 cl.LESS_THAN(cl.COL("latitude"), cl.VAL(lat_max)),
                 cl.GREATER_THAN(cl.COL("longitude"), cl.VAL(lon_min)),
@@ -62,38 +61,53 @@ class SocrataLookup:
                     cl.CONTAINS(cl.COL("customtext"), cl.VAL("PARK")), 
                     cl.CONTAINS(cl.COL("categoryde"), cl.VAL("PARK"))
                 )
-            ),
-            query_callback
-        )
-
-        
-    @classmethod
-    def get_sign(cls, id, callback):
-        # the callback upon this api query success
-        def query_callback(data):
-            if type(data) != list:
-                callback(data)
-            elif len(data) != 1:
-                callback(None)
-            else:
-                if 'crimes' in data[0]:
-                    print "FUCK"
-                cls.sign_cache.cache_data(data[0]['objectid'], data[0])
-                callback(data[0])
-    
-        # use cache
-        cached_res = cls.sign_cache.get_data(id)
-        if cached_res:
-            query_callback(cached_res)
-            return
+            )
             
-        # query
-        cl = SoClient("data.seattle.gov", "it8u-sznv")
-        cl.query_a(cl.EQUALS(cl.COL("objectid"), cl.VAL(id)), query_callback)
+            # perform the asynch request
+            data = yield tornado.gen.Task(cl.query_rows, query)
+            
+            # Save to cache
+            for d in data:
+                cls.sign_cache.cache_data(d['objectid'], d)
+            cls.sign_cache.cache_query(lat, lon, meters_new, [ d['objectid'] for d in data ])
+        
+        callback(data)
 
         
     @classmethod
-    def get_crimes(cls, lat, lon, meters, callback):
+    @tornado.gen.engine
+    def get_sign(cls, id, callback=lambda x : x):
+        # use cache
+        data = cls.sign_cache.get_data(id)
+        
+        # cache is bad, make new request
+        if not data:            
+            cl = cls.sign_client
+            query = cl.EQUALS(cl.COL("objectid"), cl.VAL(id))
+            data = yield tornado.gen.Task(cl.query_rows, query)
+            
+            # extract sign if we got a list back, otherwise will be single item or None
+            if type(data) == list:
+                if len(data) == 1:
+                    data = data[0]
+                else:
+                    data = None
+                
+            if data:
+                cls.sign_cache.cache_data(data['objectid'], data)
+        
+        callback(data)
+
+        
+    @classmethod
+    @tornado.gen.engine
+    def get_crimes(
+            cls, 
+            lat, 
+            lon, 
+            meters, 
+            callback=lambda x : x
+    ):
         # format input
         lat = float(lat)
         lon = float(lon)
@@ -101,28 +115,16 @@ class SocrataLookup:
         
         # Increase meters to pre-load cache
         meters_new = meters * prefetch_buffer
-        
-        # the callback upon this function success
-        def query_callback(data):
-            # Save to cache
-            for d in data:
-                cls.crime_cache.cache_data(d['rms_cdw_id'], d)
-            cls.crime_cache.cache_query(lat, lon, meters_new, [ d['rms_cdw_id'] for d in data ])
-            # call the callback w/ the data
-            callback(data)
-        
-        # use cache
-        cached_res = cls.crime_cache.get_query(lat, lon, meters)
-        if cached_res:
-            query_callback(cached_res)
-            return
 
-        # Make a socrata client            
-        cl = SoClient("data.seattle.gov", "7ais-f98f")
-
-        # perform the asynch request
-        cl.query_a(
-            cl.AND(
+        # load cache
+        data = cls.crime_cache.get_query(lat, lon, meters)
+        
+        # cache is bad, make new request
+        if not data:
+            # Make a socrata client            
+            cl = cls.crime_client
+            
+            query = cl.AND(
                 cl.OR(
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("THEFT-CARPROWL")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("VEH-THEFT-AUTO")),
@@ -160,27 +162,41 @@ class SocrataLookup:
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("VEH-THEFT-TRAILER")),
                     cl.EQUALS(cl.COL("offense_type"), cl.VAL("WEAPON-CONCEALED"))
                 ),
-                cl.CIRCLE("location", lat, lon, meters_new),
+                cl.WITHIN_CIRCLE(cl.COL("location"), cl.VAL(lat), cl.VAL(lon), cl.VAL(meters_new)),
                 cl.GREATER_THAN(cl.COL("occurred_date_or_date_range_start"), cl.VAL("1900-01-01T00:00:00"))
-            ),
-            query_callback
-        )
+            )
+            
+            # perform the asynch request
+            data = yield tornado.gen.Task(cl.query_rows, query)
+            
+            # Save to cache
+            for d in data:
+                cls.crime_cache.cache_data(d['rms_cdw_id'], d)
+            cls.crime_cache.cache_query(lat, lon, meters_new, [ d['rms_cdw_id'] for d in data ])
+            
+        callback(data)
          
          
     @classmethod
-    def get_crime(cls, id):
+    @tornado.gen.engine
+    def get_crime(cls, id, callback=lambda x : x):
         # use cache
-        cached_res = cls.crime_cache.get_data(id)
-        if cached_res:
-            return cached_res
-            
-        # query and save to cache
-        cl = SoClient("data.seattle.gov", "7ais-f98f")
-        data = cl.query(cl.EQUALS(cl.COL("rms_cdw_id"), cl.VAL(id)))
-        if not data:
-            return None    
-
-        # save to cache
-        cls.crime_cache.cache_data(data[0]['rms_cdw_id'], data[0])
+        data = cls.crime_cache.get_data(id)
         
-        return data[0]
+        # cache is bad, make new request
+        if not data:            
+            cl = cls.crime_client
+            query = cl.EQUALS(cl.COL("rms_cdw_id"), cl.VAL(id))
+            data = yield tornado.gen.Task(cl.query_rows, query)
+            
+            # extract sign if we got a list back, otherwise will be single item or None
+            if type(data) == list:
+                if len(data) == 1:
+                    data = data[0]
+                else:
+                    data = None
+                
+            if data:
+                cls.crime_cache.cache_data(data['rms_cdw_id'], data)
+        
+        callback(data)

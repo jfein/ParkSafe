@@ -1,0 +1,3 @@
+[submodule "PySocrataClient"]
+	path = PySocrataClient
+	url = git://github.com/jfein/PySocrataClient.git
